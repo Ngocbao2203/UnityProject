@@ -1,31 +1,36 @@
-using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
+
 public class ItemManager : MonoBehaviour
 {
-    public Collectable[] collectableItems; // Array of collectable items
+    public Item[] items;
 
-    private Dictionary<CollectableType, Collectable> collectableItemsDict = 
-        new Dictionary<CollectableType, Collectable>(); // Dictionary to hold items by name
+    public Dictionary<string, Item> collectableItemsDict = new Dictionary<string, Item>();
+
     private void Awake()
     {
-        foreach (Collectable item in collectableItems)
+        foreach (Item collectable in items)
         {
-            AddItem(item);
+            AddItem(collectable);
         }
     }
-    private void AddItem(Collectable item)
+
+    private void AddItem(Item item)
     {
-        if (!collectableItemsDict.ContainsKey(item.type))
+        if (!collectableItemsDict.ContainsKey(item.data.itemName))
         {
-            collectableItemsDict.Add(item.type, item);
+            collectableItemsDict.Add(item.data.itemName, item);
         }
     }
-    public Collectable GetItemByType(CollectableType type)
+
+    public Item GetItemByName(string key)
     {
-        if (collectableItemsDict.ContainsKey(type))
+        if (collectableItemsDict.ContainsKey(key))
         {
-            return collectableItemsDict[type];
+            return collectableItemsDict[key];
         }
-        return null; // Return null if the item is not found
+
+        return null;
     }
 }

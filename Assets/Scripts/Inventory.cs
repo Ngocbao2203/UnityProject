@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,78 +8,143 @@ public class Inventory
     [System.Serializable]
     public class Slot
     {
-        public CollectableType type;
-        public int count; // Number of items in this slot
-        public int maxAllowed; // Maximum number of items allowed in this slot
+        public string itemName;
+        public int count;
+        public int maxAllowed;
 
-        public Sprite icon; // Icon representing the item in this slot
+        public Sprite icon;
+
         public Slot()
-        { 
-            type = CollectableType.NONE; // Default type is NONE
-            count = 0; // Start with zero items in the slot
-            maxAllowed = 99; // Default maximum allowed items in the slot
-        }
-        public bool CanAddItem()
         {
-            if (count < maxAllowed)
+            itemName = "";
+            count = 0;
+            maxAllowed = 99;
+        }
+
+        public bool IsEmpty
+        {
+            get
             {
-                return true; // Can add item if count is less than max allowed
+                if (itemName == "" && count == 0)
+                {
+                    return true;
+                }
+
+                return false;
             }
-            return false; // Cannot add item if count is equal to or greater than max allowed
         }
-        public void AddItem(Collectable item)
+
+        public bool CanAddItem(string itemName)
         {
-            this.type = item.type; // Set the type of the item being added
-            this.icon = item.icon; // Set the icon of the item being added
+            if (this.itemName == itemName && count < maxAllowed)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public void AddItem(Item item)
+        {
+            this.itemName = item.data.itemName;
+            this.icon = item.data.icon;
             count++;
         }
+
+        public void AddItem(string itemName, Sprite icon, int maxAllowed)
+        {
+            this.itemName = itemName;
+            this.icon = icon;
+            this.maxAllowed = maxAllowed;
+            count++;
+        }
+
         public void RemoveItem()
         {
             if (count > 0)
             {
-                count--; // Decrease the count of items in the slot
+                count--;
 
                 if (count == 0)
                 {
                     icon = null;
-                    type = CollectableType.NONE; // Reset the type to NONE if count reaches zero
+                    itemName = "";
                 }
             }
         }
     }
 
-    public List<Slot> slots = new List<Slot>(); // List of slots in the inventory
+    public List<Slot> slots = new List<Slot>();
+    public Slot selectedSlot = null;
+
     public Inventory(int numSlots)
     {
         for (int i = 0; i < numSlots; i++)
         {
-            Slot slot = new Slot(); // Create a new slot
-            slots.Add(slot);
+            slots.Add(new Slot());
         }
     }
 
-    public void Add(Collectable item)
+    public void Add(Item item)
     {
         foreach (Slot slot in slots)
         {
-            if (slot.type == item.type && slot.CanAddItem())
+            if (slot.itemName == item.data.itemName && slot.CanAddItem(item.data.itemName))
             {
-                    slot.AddItem(item); // Add item to the slot if it matches the type and can be added
-                    return; // Exit after adding the item
+                slot.AddItem(item);
+                return;
             }
         }
+
         foreach (Slot slot in slots)
         {
-            if (slot.type == CollectableType.NONE)
+            if (slot.itemName == "")
             {
-                slot.AddItem(item); // Add item to an empty slot
-                return; // Exit after adding the item
+                slot.AddItem(item);
+                return;
             }
         }
     }
+
     public void Remove(int index)
     {
-        slots[index].RemoveItem(); // Pass the required 'amount' parameter to RemoveItem  
+        slots[index].RemoveItem();
     }
 
+    public void Remove(int index, int count)
+    {
+        if (slots[index].count >= count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                Remove(index);
+            }
+        }
+    }
+
+    public void MoveSlot(int fromIndex, int toIndex, Inventory toInventory, int numToMove = 1)
+    {
+        if (slots != null && slots.Count > 0)
+        {
+            Slot fromSlot = slots[fromIndex];
+            Slot toSlot = toInventory.slots[toIndex];
+
+            for (int i = 0; i < numToMove; i++)
+            {
+                if (toSlot.IsEmpty || toSlot.CanAddItem(fromSlot.itemName))
+                {
+                    toSlot.AddItem(fromSlot.itemName, fromSlot.icon, fromSlot.maxAllowed);
+                    fromSlot.RemoveItem();
+                }
+            }
+        }
+    }
+
+    public void SelectSlot(int index)
+    {
+        if (slots != null && slots.Count > 0)
+        {
+            selectedSlot = slots[index];
+        }
+    }
 }

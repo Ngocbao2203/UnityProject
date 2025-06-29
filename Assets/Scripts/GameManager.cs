@@ -6,7 +6,11 @@ public class GameManager : MonoBehaviour
 
     public ItemManager itemManager;
     public TileManager tileManager;
+    public UI_Manager uiManager;
 
+    public Player player;
+
+    [System.Obsolete]
     private void Awake()
     {
         if (instance != null && instance != this)
@@ -21,5 +25,8 @@ public class GameManager : MonoBehaviour
 
         itemManager = GetComponent<ItemManager>();
         tileManager = GetComponent<TileManager>();
+        uiManager = GetComponent<UI_Manager>();
+
+        player = FindObjectOfType<Player>();
     }
 }

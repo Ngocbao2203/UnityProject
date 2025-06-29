@@ -1,37 +1,45 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using System.Collections.Generic;
+using UnityEditor;
+using UnityEngine;
 
 public class Movement : MonoBehaviour
 {
-    public float speed = 5f;
+    public float speed;
     public Animator animator;
 
-    private Vector2 lastMoveDir = Vector2.down;
+    private Vector3 direction;
 
-    void Update()
+    private void Update()
     {
         float horizontal = Input.GetAxisRaw("Horizontal");
         float vertical = Input.GetAxisRaw("Vertical");
-        Vector2 inputDir = new Vector2(horizontal, vertical);
 
-        if (inputDir.sqrMagnitude > 0.01f)
-        {
-            lastMoveDir = inputDir.normalized;
-        }
+        direction = new Vector3(horizontal, vertical).normalized;
 
-        AnimateMovement(inputDir);
-        transform.position += (Vector3)inputDir * speed * Time.deltaTime;
+        AnimateMovement(direction);
     }
 
-    void AnimateMovement(Vector2 inputDir)
+    private void FixedUpdate()
     {
-        if (animator == null) return;
-
-        bool isMoving = inputDir.sqrMagnitude > 0.01f;
-        Vector2 animDir = isMoving ? inputDir.normalized : lastMoveDir;
-
-        animator.SetBool("isMoving", isMoving);
-        animator.SetFloat("horizontal", animDir.x);
-        animator.SetFloat("vertical", animDir.y);
+        transform.position += direction * speed * Time.deltaTime;
     }
 
+    private void AnimateMovement(Vector3 direction)
+    {
+        if (animator != null)
+        {
+            if (direction.magnitude > 0)
+            {
+                animator.SetBool("isMoving", true);
+
+                animator.SetFloat("horizontal", direction.x);
+                animator.SetFloat("vertical", direction.y);
+            }
+            else
+            {
+                animator.SetBool("isMoving", false);
+            }
+        }
+    }
 }

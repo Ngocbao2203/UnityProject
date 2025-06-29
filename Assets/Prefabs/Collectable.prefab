@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6935041593941241894}
   - component: {fileID: 6479902578214994431}
   - component: {fileID: -2268705276709780426}
+  - component: {fileID: 4121688842746351723}
   m_Layer: 0
   m_Name: Collectable
   m_TagString: Untagged
@@ -79,7 +80,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 3
-  m_Sprite: {fileID: -406706973061953441, guid: 6a055d44be8ceb641880d53cb112e600, type: 3}
+  m_Sprite: {fileID: 2161777497763536343, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -102,9 +103,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e13a8e347106df04a97d598abe6dda18, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  type: 1
-  icon: {fileID: -406706973061953441, guid: 6a055d44be8ceb641880d53cb112e600, type: 3}
-  rb2d: {fileID: 0}
 --- !u!61 &6479902578214994431
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -143,7 +141,7 @@ BoxCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.4375, y: 0.46875}
+    oldSize: {x: 0.875, y: 0.9375}
     newSize: {x: 0.4375, y: 0.46875}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
@@ -178,3 +176,17 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 4
+--- !u!114 &4121688842746351723
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4972013826651843784}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 636d51a81ba69aa4e851b9c586427f19, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  data: {fileID: 11400000, guid: 44b168fdc6d7d944da07cfe6151da94f, type: 2}
+  rb2d: {fileID: 0}
