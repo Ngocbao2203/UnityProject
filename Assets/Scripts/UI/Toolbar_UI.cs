@@ -1,4 +1,4 @@
-using System.Collections; // Importing System namespace for basic functionalities
+﻿using System.Collections; // Importing System namespace for basic functionalities
 using System.Collections.Generic; // Importing System.Collections.Generic for List<T> usage
 using UnityEngine;
 

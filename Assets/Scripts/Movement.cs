@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEditor;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class Movement : MonoBehaviour
 {
@@ -9,6 +6,12 @@ public class Movement : MonoBehaviour
     public Animator animator;
 
     private Vector3 direction;
+    private Player player;
+
+    private void Awake()
+    {
+        player = GetComponent<Player>();
+    }
 
     private void Update()
     {
@@ -32,9 +35,14 @@ public class Movement : MonoBehaviour
             if (direction.magnitude > 0)
             {
                 animator.SetBool("isMoving", true);
-
                 animator.SetFloat("horizontal", direction.x);
                 animator.SetFloat("vertical", direction.y);
+
+                if (player != null)
+                {
+                    // Cập nhật hướng nhìn hiện tại để dùng khi Hoe
+                    player.facingDirection = new Vector2(Mathf.Round(direction.x), Mathf.Round(direction.y));
+                }
             }
             else
             {

@@ -10489,6 +10489,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inventoryManager: {fileID: 1545796060}
   tileManager: {fileID: 0}
+  animator: {fileID: 1746640274}
+  facingDirection: {x: 0, y: -1}
 --- !u!114 &1545796060
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -37389,9 +37391,41 @@ PrefabInstance:
       propertyPath: m_Name
       value: Hoe_Collectable
       objectReference: {fileID: 0}
+    - target: {fileID: 2715676729355816784, guid: ca596d657b70ab94982328fd8f8178ff, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: -2243613801348123288, guid: 02a34da572bf7474186cb5831a5d5f0f, type: 3}
+    - target: {fileID: 5214921115558850443, guid: ca596d657b70ab94982328fd8f8178ff, type: 3}
+      propertyPath: m_Size.x
+      value: 0.41366565
+      objectReference: {fileID: 0}
+    - target: {fileID: 5214921115558850443, guid: ca596d657b70ab94982328fd8f8178ff, type: 3}
+      propertyPath: m_Size.y
+      value: 0.4793254
+      objectReference: {fileID: 0}
+    - target: {fileID: 5214921115558850443, guid: ca596d657b70ab94982328fd8f8178ff, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5214921115558850443, guid: ca596d657b70ab94982328fd8f8178ff, type: 3}
+      propertyPath: m_Offset.x
+      value: -0.0006019473
+      objectReference: {fileID: 0}
+    - target: {fileID: 5214921115558850443, guid: ca596d657b70ab94982328fd8f8178ff, type: 3}
+      propertyPath: m_Offset.y
+      value: -0.00008255243
+      objectReference: {fileID: 0}
     - target: {fileID: 5214921115558850443, guid: ca596d657b70ab94982328fd8f8178ff, type: 3}
       propertyPath: m_IsTrigger
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5214921115558850443, guid: ca596d657b70ab94982328fd8f8178ff, type: 3}
+      propertyPath: m_SpriteTilingProperty.oldSize.x
+      value: 0.40625
+      objectReference: {fileID: 0}
+    - target: {fileID: 5214921115558850443, guid: ca596d657b70ab94982328fd8f8178ff, type: 3}
+      propertyPath: m_SpriteTilingProperty.oldSize.y
+      value: 0.46875
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

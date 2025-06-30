@@ -1,11 +1,13 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 
 public class Player : MonoBehaviour
 {
     public InventoryManager inventoryManager;
     public TileManager tileManager;
+    public Animator animator;
 
-    private Vector2Int facingDirection = Vector2Int.down;
+    [HideInInspector] public Vector2 facingDirection = Vector2.down; // cập nhật từ Movement.cs
 
     private void Start()
     {
@@ -14,29 +16,40 @@ public class Player : MonoBehaviour
 
     void Update()
     {
-        // Cập nhật hướng nếu có di chuyển
-        if (Input.GetKeyDown(KeyCode.W)) facingDirection = Vector2Int.up;
-        else if (Input.GetKeyDown(KeyCode.S)) facingDirection = Vector2Int.down;
-        else if (Input.GetKeyDown(KeyCode.A)) facingDirection = Vector2Int.left;
-        else if (Input.GetKeyDown(KeyCode.D)) facingDirection = Vector2Int.right;
-
         if (Input.GetKeyDown(KeyCode.Space))
         {
             if (tileManager != null)
             {
                 Vector3Int currentCell = Vector3Int.FloorToInt(transform.position);
-                Vector3Int targetCell = currentCell + new Vector3Int(facingDirection.x, facingDirection.y, 0);
+                Vector3Int targetCell = currentCell + new Vector3Int((int)facingDirection.x, (int)facingDirection.y, 0);
 
                 string tileName = tileManager.GetTileName(targetCell);
                 if (!string.IsNullOrWhiteSpace(tileName))
                 {
                     if (tileName == "Interactable" && inventoryManager.toolbar.selectedSlot.itemName == "Hoe")
                     {
-                        tileManager.SetInteracted(targetCell);
+                        // Gọi Coroutine để delay cuốc đất
+                        StartCoroutine(PerformHoeAction(targetCell));
                     }
                 }
             }
         }
+    }
+
+    private IEnumerator PerformHoeAction(Vector3Int targetCell)
+    {
+        // 1. Gửi hướng vào Animator để Blend Tree chọn đúng hướng
+        animator.SetFloat("horizontal", facingDirection.x);
+        animator.SetFloat("vertical", facingDirection.y);
+
+        // 2. Trigger animation Hoe
+        animator.SetTrigger("UseHoe");
+
+        // 3. Đợi animation hoàn tất (0.5s hoặc đúng thời gian thật)
+        yield return new WaitForSeconds(0.5f);
+
+        // 4. Thực hiện cuốc đất
+        tileManager.SetInteracted(targetCell);
     }
 
     public void DropItem(Item item)
