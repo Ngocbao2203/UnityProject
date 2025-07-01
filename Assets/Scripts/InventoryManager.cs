@@ -4,7 +4,10 @@ using UnityEngine;
 
 public class InventoryManager : MonoBehaviour
 {
-    public Dictionary<string, Inventory> inventoryByName = new Dictionary<string, Inventory>();
+    private readonly Dictionary<string, Inventory> inventoryByName = new();
+
+    private const string BACKPACK = "Backpack";
+    private const string TOOLBAR = "Toolbar";
 
     [Header("Backpack")]
     public Inventory backpack;
@@ -14,34 +17,25 @@ public class InventoryManager : MonoBehaviour
     public Inventory toolbar;
     public int toolbarSlotsCount = 9;
 
-
     private void Awake()
     {
         backpack = new Inventory(backpackSlotsCount);
         toolbar = new Inventory(toolbarSlotsCount);
 
-        inventoryByName.Add("Backpack", backpack);
-        inventoryByName.Add("Toolbar", toolbar);
+        inventoryByName.Add(BACKPACK, backpack);
+        inventoryByName.Add(TOOLBAR, toolbar);
     }
 
     public Inventory GetInventoryByName(string name)
     {
-        if (inventoryByName.ContainsKey(name))
-        {
-            return inventoryByName[name];
-        }
-
-        return null;
+        return inventoryByName.TryGetValue(name, out var inventory) ? inventory : null;
     }
 
-    public void Add(string inventoryName, Item item)
+    public void AddItem(string inventoryName, Item item)
     {
-        if (inventoryByName != null)
+        if (inventoryByName.TryGetValue(inventoryName, out var inventory))
         {
-            if (inventoryByName.ContainsKey(inventoryName))
-            {
-                inventoryByName[inventoryName].Add(item);
-            }
+            inventory.Add(item);
         }
     }
 }

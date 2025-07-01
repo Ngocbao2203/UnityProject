@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 13312, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: Summer_Plowed
+  m_Name: Summer_Watered
   m_EditorClassIdentifier: 
-  m_Sprite: {fileID: -5358493649051410551, guid: 942f453feed09af42884c05db2320a61, type: 3}
+  m_Sprite: {fileID: 1455424091562576901, guid: 942f453feed09af42884c05db2320a61, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Transform:
     e00: 1
