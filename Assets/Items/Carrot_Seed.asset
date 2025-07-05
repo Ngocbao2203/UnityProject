@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
-  m_Name: Carrot_Seeds
+  m_Name: Carrot_Seed
   m_EditorClassIdentifier: 
   itemName: Carrot Seeds
   icon: {fileID: 2161777497763536343, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
-  cropPrefab: {fileID: 0}
+  cropPrefab: {fileID: 4469506211353425115, guid: dae2fe58b998e4349a0338c994bb8ee4, type: 3}

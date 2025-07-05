@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: -2268705276709780426}
   - component: {fileID: 4121688842746351723}
   m_Layer: 0
-  m_Name: Collectable
+  m_Name: CarrotSeed
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -30,7 +30,7 @@ Transform:
   m_GameObject: {fileID: 4972013826651843784}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -14.459147, y: -2.504616, z: 0}
+  m_LocalPosition: {x: 4.21, y: -6.53, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -79,7 +79,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 3
+  m_SortingOrder: 5
   m_Sprite: {fileID: 2161777497763536343, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0

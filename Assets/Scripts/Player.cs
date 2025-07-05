@@ -7,6 +7,8 @@ public class Player : MonoBehaviour
     public TileManager tileManager;
     public Animator animator;
 
+    [HideInInspector] public bool canMove = true;
+
     [SerializeField] private GameObject cropParent;
 
     [HideInInspector] public Vector2 facingDirection = Vector2.down;
@@ -93,22 +95,30 @@ public class Player : MonoBehaviour
 
     private IEnumerator PerformHoeAction(Vector3Int targetCell)
     {
+        canMove = false;
+
         animator.SetFloat("horizontal", facingDirection.x);
         animator.SetFloat("vertical", facingDirection.y);
         animator.SetTrigger("UseHoe");
 
         yield return new WaitForSeconds(0.5f);
         tileManager.SetInteracted(targetCell);
+
+        canMove = true;
     }
 
     private IEnumerator PerformWateringAction(Vector3Int targetCell)
     {
+        canMove = false;
+
         animator.SetFloat("horizontal", facingDirection.x);
         animator.SetFloat("vertical", facingDirection.y);
         animator.SetTrigger("UseWateringCan");
 
         yield return new WaitForSeconds(0.5f);
         tileManager.SetWatered(targetCell);
+
+        canMove = true;
 
         Vector3 world = tileManager.interactableMap.GetCellCenterWorld(targetCell);
         Collider2D col = Physics2D.OverlapCircle(world, 0.25f);

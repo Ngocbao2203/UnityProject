@@ -15,6 +15,13 @@ public class Movement : MonoBehaviour
 
     private void Update()
     {
+        if (!player.canMove)
+        {
+            AnimateMovement(Vector3.zero); // Giữ nhân vật đứng yên
+            direction = Vector3.zero;
+            return;
+        }
+
         float horizontal = Input.GetAxisRaw("Horizontal");
         float vertical = Input.GetAxisRaw("Vertical");
 

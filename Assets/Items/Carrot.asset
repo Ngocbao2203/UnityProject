@@ -9,9 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dee72737652d35347bbbee4929af0d8c, type: 3}
-  m_Name: ProductData
+  m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
+  m_Name: Carrot
   m_EditorClassIdentifier: 
-  productName: Corn
-  price: 100
-  icon: {fileID: -2785801568943743307, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  itemName: Carrot
+  icon: {fileID: -1407192652626693244, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  cropPrefab: {fileID: 0}

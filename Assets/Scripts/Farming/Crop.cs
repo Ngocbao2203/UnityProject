@@ -117,7 +117,12 @@ public class Crop : MonoBehaviour
                 Instantiate(cropData.harvestPrefab, transform.position, Quaternion.identity);
             }
 
+            // ✅ Reset tile về tương tác sau khi thu hoạch
+            Vector3Int tilePos = TileManager.Instance.interactableMap.WorldToCell(transform.position);
+            TileManager.Instance.ResetTile(tilePos);
+
             Destroy(gameObject);
         }
     }
+
 }
