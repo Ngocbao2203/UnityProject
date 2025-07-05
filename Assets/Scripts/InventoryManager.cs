@@ -1,9 +1,10 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class InventoryManager : MonoBehaviour
 {
+    public static InventoryManager Instance { get; private set; }
+
     private readonly Dictionary<string, Inventory> inventoryByName = new();
 
     private const string BACKPACK = "Backpack";
@@ -19,6 +20,13 @@ public class InventoryManager : MonoBehaviour
 
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+
         backpack = new Inventory(backpackSlotsCount);
         toolbar = new Inventory(toolbarSlotsCount);
 
@@ -37,5 +45,22 @@ public class InventoryManager : MonoBehaviour
         {
             inventory.Add(item);
         }
+    }
+
+    public bool HasItem(string inventoryName, ItemData itemData)
+    {
+        if (!inventoryByName.ContainsKey(inventoryName)) return false;
+
+        Inventory inventory = inventoryByName[inventoryName];
+
+        foreach (Inventory.Slot slot in inventory.slots)
+        {
+            if (!slot.IsEmpty && slot.itemData != null && slot.itemData.itemName == itemData.itemName)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
