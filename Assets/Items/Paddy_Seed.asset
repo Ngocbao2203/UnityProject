@@ -15,3 +15,4 @@ MonoBehaviour:
   itemName: Paddy Seed
   icon: {fileID: 4183160700423988859, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   cropPrefab: {fileID: 4469506211353425115, guid: cda0931b98d69bd4195995d2e2b23375, type: 3}
+  itemType: 0

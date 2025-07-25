@@ -33,12 +33,26 @@ public class Player : MonoBehaviour
         }
     }
 
-    private void HandlePrimaryAction()
+    public void HandlePrimaryAction()
     {
-        if (inventoryManager == null || inventoryManager.toolbar == null ||
-            inventoryManager.toolbar.selectedSlot == null)
+        Toolbar_UI toolbarUI = FindFirstObjectByType<Toolbar_UI>();
+        if (toolbarUI == null || toolbarUI.selectedSlot == null)
         {
-            Debug.LogWarning("[Plant] Không có slot được chọn!");
+            Debug.LogWarning("[Plant] Không có slot được chọn từ Toolbar_UI!");
+            return;
+        }
+
+        Inventory.Slot selectedSlot = toolbarUI.selectedSlot.GetSlot();
+        if (selectedSlot == null || selectedSlot.IsEmpty)
+        {
+            Debug.LogWarning("[Plant] Slot trống hoặc không hợp lệ!");
+            return;
+        }
+
+        ItemData itemData = selectedSlot.itemData;
+        if (itemData == null)
+        {
+            Debug.LogWarning("⚠️ [Plant] ItemData null!");
             return;
         }
 
@@ -46,17 +60,8 @@ public class Player : MonoBehaviour
         Vector3Int targetCell = currentCell + new Vector3Int((int)facingDirection.x, (int)facingDirection.y, 0);
         string tileName = tileManager.GetTileName(targetCell);
 
-        string itemName = inventoryManager.toolbar.selectedSlot.itemName;
-        ItemData itemData = inventoryManager.toolbar.selectedSlot.itemData;
-
-        if (itemData == null)
-        {
-            Debug.LogWarning("⚠️ [Plant] ItemData null!");
-            return;
-        }
-
         // 🪓 Cuốc đất
-        if (itemName == "Hoe" && tileName == "Interactable")
+        if (itemData.itemName == "Hoe" && tileName == "Interactable")
         {
             Debug.Log($"🪓 Cuốc đất tại {targetCell}");
             StartCoroutine(PerformHoeAction(targetCell));
@@ -64,7 +69,7 @@ public class Player : MonoBehaviour
         }
 
         // 💧 Tưới cây
-        if (itemName == "WateringCan" && (tileName == "Summer_Plowed" || tileName == "Summer_Watered"))
+        if (itemData.itemName == "WateringCan" && (tileName == "Summer_Plowed" || tileName == "Summer_Watered"))
         {
             Debug.Log($"💧 Tưới cây tại {targetCell}");
             StartCoroutine(PerformWateringAction(targetCell));
@@ -72,12 +77,11 @@ public class Player : MonoBehaviour
         }
 
         // 🌱 Trồng cây
-        if (itemData.cropPrefab != null &&
+        if (itemData.itemType == ItemData.ItemType.Seed && itemData.cropPrefab != null &&
             (tileName == "Summer_Plowed" || tileName == "Summer_Watered"))
         {
-            Debug.Log($"🌱 Trồng cây {itemData.itemName} tại {targetCell}");
-            TryPlantCrop(targetCell, itemData, tileName);
-            inventoryManager.toolbar.selectedSlot.RemoveItem();
+            Debug.Log($"🌱 Kiểm tra trồng cây {itemData.itemName} tại {targetCell}");
+            TryPlantCrop(targetCell, itemData, tileName, toolbarUI, selectedSlot); // Truyền toolbarUI và selectedSlot
             return;
         }
 
@@ -86,7 +90,6 @@ public class Player : MonoBehaviour
         {
             Debug.LogWarning($"⚠️ [Plant] Item '{itemData.itemName}' không phải hạt giống (cropPrefab == null)");
         }
-
         if (tileName != "Summer_Plowed" && tileName != "Summer_Watered")
         {
             Debug.LogWarning($"⚠️ [Plant] Không thể trồng tại: {tileName}.");
@@ -152,17 +155,16 @@ public class Player : MonoBehaviour
         canMove = true;
     }
 
-
-    private void TryPlantCrop(Vector3Int targetCell, ItemData itemData, string tileName)
+    private void TryPlantCrop(Vector3Int targetCell, ItemData itemData, string tileName, Toolbar_UI toolbarUI, Inventory.Slot selectedSlot)
     {
         Vector3 worldPos = tileManager.interactableMap.CellToWorld(targetCell) + new Vector3(0.5f, 0.5f, 0f);
 
-        // 🔍 Kiểm tra xem đã có cây ở ô này chưa
-        Collider2D existingCrop = Physics2D.OverlapCircle(worldPos, 0.25f);
+        // 🔍 Kiểm tra xem đã có cây ở ô này chưa, tăng bán kính phát hiện
+        Collider2D existingCrop = Physics2D.OverlapCircle(worldPos, 0.5f); // Tăng từ 0.25f lên 0.5f
         if (existingCrop != null && existingCrop.GetComponent<Crop>() != null)
         {
             Debug.LogWarning($"⚠️ [Plant] Đã có cây ở ô {targetCell}, không thể trồng đè!");
-            return;
+            return; // Không giảm số lượng nếu có cây
         }
 
         // 🌱 Tiến hành trồng cây
@@ -177,6 +179,15 @@ public class Player : MonoBehaviour
         {
             crop.Water();
             Debug.Log("💧 [Plant] Trồng trên đất đã tưới → tính 1 lần tưới.");
+        }
+
+        // Giảm số lượng chỉ khi trồng thành công
+        int selectedIndex = toolbarUI.toolbarSlots.IndexOf(toolbarUI.selectedSlot);
+        if (selectedIndex >= 0)
+        {
+            InventoryManager.Instance.UseItem(InventoryManager.TOOLBAR, selectedIndex);
+            toolbarUI.selectedSlot.UpdateSlotUI();
+            Debug.Log($"🌱 Trồng thành công {itemData.itemName}, số lượng còn lại: {selectedSlot.count}");
         }
     }
 

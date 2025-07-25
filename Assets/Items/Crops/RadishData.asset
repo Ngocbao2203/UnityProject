@@ -13,10 +13,15 @@ MonoBehaviour:
   m_Name: RadishData
   m_EditorClassIdentifier: 
   cropName: Radish
+  cropIcon: {fileID: 1211955454, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   growthStages:
   - {fileID: -972495551902887074, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: 6849194982135307561, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: -7057375707926749745, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: 7047291313409791736, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   growthWaters: 010000000100000001000000
+  growthStageTimes:
+  - 5
+  - 5
+  - 5
   harvestPrefab: {fileID: 4833101433679325619, guid: 701ce009d53266b4aa9f8a566d61dc70, type: 3}

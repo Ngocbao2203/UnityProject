@@ -13,10 +13,15 @@ MonoBehaviour:
   m_Name: CucumberData
   m_EditorClassIdentifier: 
   cropName: Cucumber
+  cropIcon: {fileID: 1337806114678918342, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   growthStages:
   - {fileID: 2340613614041932094, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: -2227832012819510273, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: -7827499416449815192, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: 4513640947493604732, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   growthWaters: 010000000100000001000000
+  growthStageTimes:
+  - 5
+  - 5
+  - 5
   harvestPrefab: {fileID: 4833101433679325619, guid: 8d514ab373ba2c54abfed09b91f37136, type: 3}

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: CarrotData
   m_EditorClassIdentifier: 
   cropName: Carrot
+  cropIcon: {fileID: -1407192652626693244, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   growthStages:
   - {fileID: -5784410927573482350, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: 7448935753994061408, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
@@ -20,7 +21,7 @@ MonoBehaviour:
   - {fileID: 8796380703106566107, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   growthWaters: 010000000100000001000000
   growthStageTimes:
-  - 10
-  - 15
-  - 20
+  - 5
+  - 5
+  - 5
   harvestPrefab: {fileID: 4833101433679325619, guid: 820ab50b57d10754a807743e03387004, type: 3}

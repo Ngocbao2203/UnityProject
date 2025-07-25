@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: CornData
   m_EditorClassIdentifier: 
   cropName: CornData
+  cropIcon: {fileID: -2785801568943743307, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   growthStages:
   - {fileID: 6194069981415278876, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: 1302930124755786175, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
@@ -20,4 +21,9 @@ MonoBehaviour:
   - {fileID: 736865317306615500, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: 3482569451149137530, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   growthWaters: 01000000010000000100000001000000
+  growthStageTimes:
+  - 5
+  - 5
+  - 5
+  - 5
   harvestPrefab: {fileID: 4833101433679325619, guid: 27d8587679a6b3d47a0f88737e4e4b44, type: 3}

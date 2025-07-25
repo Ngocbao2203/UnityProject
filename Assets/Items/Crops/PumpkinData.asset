@@ -13,10 +13,15 @@ MonoBehaviour:
   m_Name: PumpkinData
   m_EditorClassIdentifier: 
   cropName: Pumpkin
+  cropIcon: {fileID: 8927835903354673726, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   growthStages:
   - {fileID: -261361533921887324, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: -7051298420961986638, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: 9113586584930331469, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: 248884431, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   growthWaters: 010000000100000001000000
+  growthStageTimes:
+  - 5
+  - 5
+  - 5
   harvestPrefab: {fileID: 4833101433679325619, guid: d0298e5241600f348bbeb496ff07abc1, type: 3}

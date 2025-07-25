@@ -15,3 +15,4 @@ MonoBehaviour:
   itemName: Corn Seed
   icon: {fileID: 3690553341567383519, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   cropPrefab: {fileID: 4469506211353425115, guid: 1bc82c2aa94e310488e3b55e3db5d084, type: 3}
+  itemType: 0

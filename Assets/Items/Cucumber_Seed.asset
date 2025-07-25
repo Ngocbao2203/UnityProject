@@ -15,3 +15,4 @@ MonoBehaviour:
   itemName: Cucumber Seed
   icon: {fileID: 1484927363220884529, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   cropPrefab: {fileID: 4469506211353425115, guid: 1275dd2f794b14d4badaca7182df269c, type: 3}
+  itemType: 0

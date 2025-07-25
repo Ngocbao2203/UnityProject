@@ -7,8 +7,8 @@ public class InventoryManager : MonoBehaviour
 
     private readonly Dictionary<string, Inventory> inventoryByName = new();
 
-    private const string BACKPACK = "Backpack";
-    private const string TOOLBAR = "Toolbar";
+    public const string BACKPACK = "Backpack";
+    public const string TOOLBAR = "Toolbar";
 
     [Header("Backpack")]
     public Inventory backpack;
@@ -62,5 +62,19 @@ public class InventoryManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    // Thêm phương thức UseItem
+    public void UseItem(string inventoryName, int slotIndex)
+    {
+        if (inventoryByName.TryGetValue(inventoryName, out var inventory))
+        {
+            if (slotIndex >= 0 && slotIndex < inventory.slots.Count)
+            {
+                Debug.Log($"Using item at {inventoryName}[{slotIndex}], Before: Count = {inventory.slots[slotIndex].count}, Type = {inventory.slots[slotIndex].itemData?.itemType}");
+                inventory.UseItem(slotIndex);
+                Debug.Log($"After: Count = {inventory.slots[slotIndex].count}");
+            }
+        }
     }
 }

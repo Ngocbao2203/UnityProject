@@ -15,3 +15,4 @@ MonoBehaviour:
   itemName: WateringCan
   icon: {fileID: -7178645108241483569, guid: 02a34da572bf7474186cb5831a5d5f0f, type: 3}
   cropPrefab: {fileID: 0}
+  itemType: 1

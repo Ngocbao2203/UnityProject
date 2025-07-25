@@ -15,3 +15,4 @@ MonoBehaviour:
   itemName: Carrot Seeds
   icon: {fileID: 2161777497763536343, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   cropPrefab: {fileID: 4469506211353425115, guid: dae2fe58b998e4349a0338c994bb8ee4, type: 3}
+  itemType: 0

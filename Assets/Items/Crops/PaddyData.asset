@@ -13,10 +13,15 @@ MonoBehaviour:
   m_Name: PaddyData
   m_EditorClassIdentifier: 
   cropName: Paddy
+  cropIcon: {fileID: 7206217728049200231, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   growthStages:
   - {fileID: -797183112896774214, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: -8226948184702604985, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: -4471035681727069231, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: -7536419532554554813, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   growthWaters: 010000000100000001000000
+  growthStageTimes:
+  - 5
+  - 5
+  - 5
   harvestPrefab: {fileID: 4833101433679325619, guid: 08f17fa326d9c0d4088af22bcd13b6c1, type: 3}

@@ -12,7 +12,6 @@ public class Inventory
         public int count;
         public int maxAllowed;
         public ItemData itemData;
-
         public Sprite icon;
 
         public Slot()
@@ -30,7 +29,6 @@ public class Inventory
                 {
                     return true;
                 }
-
                 return false;
             }
         }
@@ -41,7 +39,6 @@ public class Inventory
             {
                 return true;
             }
-
             return false;
         }
 
@@ -67,11 +64,11 @@ public class Inventory
             if (count > 0)
             {
                 count--;
-
                 if (count == 0)
                 {
                     icon = null;
                     itemName = "";
+                    itemData = null; // Xóa itemData khi count = 0
                 }
             }
         }
@@ -98,7 +95,6 @@ public class Inventory
                 return;
             }
         }
-
         foreach (Slot slot in slots)
         {
             if (slot.itemName == "")
@@ -148,6 +144,22 @@ public class Inventory
         if (slots != null && slots.Count > 0)
         {
             selectedSlot = slots[index];
+        }
+    }
+
+    public void UseItem(int index)
+    {
+        if (slots != null && slots.Count > index && !slots[index].IsEmpty)
+        {
+            if (slots[index].itemData.itemType == ItemData.ItemType.Seed) // Chỉ giảm nếu là hạt giống
+            {
+                slots[index].RemoveItem();
+                Debug.Log($"Used seed at index {index}, New Count: {slots[index].count}");
+            }
+            else
+            {
+                Debug.Log($"Cannot use item at index {index} as it is not a seed, Type: {slots[index].itemData?.itemType}");
+            }
         }
     }
 }
