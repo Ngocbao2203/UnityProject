@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: Carrot_Data
   m_EditorClassIdentifier: 
   productName: Carrot
-  price: 200
+  price: 2
   icon: {fileID: -1407192652626693244, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   itemData: {fileID: 11400000, guid: 40aeb3cdeff19c74787cc9abd2413b48, type: 2}

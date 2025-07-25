@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7fdf46623b393a43bb6556e4561b9da, type: 3}
+  m_Name: PumpkinData
+  m_EditorClassIdentifier: 
+  cropName: Pumpkin
+  growthStages:
+  - {fileID: -261361533921887324, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
+  - {fileID: -7051298420961986638, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
+  - {fileID: 9113586584930331469, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
+  - {fileID: 248884431, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
+  growthWaters: 010000000100000001000000
+  harvestPrefab: {fileID: 4833101433679325619, guid: d0298e5241600f348bbeb496ff07abc1, type: 3}

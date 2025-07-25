@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: Corn_Data
   m_EditorClassIdentifier: 
   productName: Corn
-  price: 100
+  price: 1
   icon: {fileID: -2785801568943743307, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   itemData: {fileID: 11400000, guid: 80233fc0562807a478be07260bfb9550, type: 2}

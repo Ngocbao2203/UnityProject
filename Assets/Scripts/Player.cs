@@ -111,20 +111,32 @@ public class Player : MonoBehaviour
     {
         canMove = false;
 
+        Vector3 world = tileManager.interactableMap.GetCellCenterWorld(targetCell);
+        Collider2D col = Physics2D.OverlapCircle(world, 0.25f);
+
+        // Nếu có cây
+        if (col != null && col.TryGetComponent(out Crop crop))
+        {
+            // ⛔ Nếu cây đang chờ phát triển → không cho tưới
+            if (crop.IsWaitingForNextStage())
+            {
+                Debug.LogWarning($"⚠️ [Crop] {crop.cropData.cropName} đã được tưới và đang chờ phát triển. Đừng tưới nữa!");
+                canMove = true;
+                yield break; // ⛔ Không thực hiện gì nữa
+            }
+        }
+
+        // ✅ Nếu không bị chặn, thực hiện animation tưới
         animator.SetFloat("horizontal", facingDirection.x);
         animator.SetFloat("vertical", facingDirection.y);
         animator.SetTrigger("UseWateringCan");
 
         yield return new WaitForSeconds(0.5f);
-        tileManager.SetWatered(targetCell);
 
-        canMove = true;
-
-        Vector3 world = tileManager.interactableMap.GetCellCenterWorld(targetCell);
-        Collider2D col = Physics2D.OverlapCircle(world, 0.25f);
-
-        if (col != null && col.TryGetComponent(out Crop crop))
+        // Sau khi tưới xong animation
+        if (col != null && col.TryGetComponent(out crop))
         {
+            tileManager.SetWatered(targetCell);
             crop.Water();
             Debug.Log($"💦 Đã tưới cây: {crop.cropData.cropName}");
         }
@@ -136,7 +148,10 @@ public class Player : MonoBehaviour
         {
             Debug.Log($"⚠️ Không tìm thấy cây nào tại {targetCell} để tưới.");
         }
+
+        canMove = true;
     }
+
 
     private void TryPlantCrop(Vector3Int targetCell, ItemData itemData, string tileName)
     {

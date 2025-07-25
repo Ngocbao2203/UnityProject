@@ -19,4 +19,8 @@ MonoBehaviour:
   - {fileID: 1116706725642825598, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   - {fileID: 8796380703106566107, guid: d55ff874f65fafb45b6538348cd8b988, type: 3}
   growthWaters: 010000000100000001000000
+  growthStageTimes:
+  - 10
+  - 15
+  - 20
   harvestPrefab: {fileID: 4833101433679325619, guid: 820ab50b57d10754a807743e03387004, type: 3}
