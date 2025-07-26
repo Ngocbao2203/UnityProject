@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,6 +9,7 @@ public class UI_Manager : MonoBehaviour
     public List<Inventory_UI> inventoryUIs;
 
     public GameObject inventoryPanel;
+    public GameObject questPanel;
 
     public static Slot_UI draggedSlot;
     public static Image draggedIcon;
@@ -23,6 +24,10 @@ public class UI_Manager : MonoBehaviour
     private void Start()
     {
         ToggleInventoryUI();
+        if (questPanel != null)
+        {
+            questPanel.SetActive(false); // Tắt bảng Quest khi game bắt đầu
+        }
     }
 
     private void Update()
@@ -35,6 +40,10 @@ public class UI_Manager : MonoBehaviour
         if (Input.GetKey(KeyCode.LeftShift))
         {
             dragSingle = true;
+        }
+        if (Input.GetKeyDown(KeyCode.J))
+        {
+            ToggleQuestPanel();
         }
         else
         {
@@ -55,6 +64,13 @@ public class UI_Manager : MonoBehaviour
             {
                 inventoryPanel.SetActive(false);
             }
+        }
+    }
+    public void ToggleQuestPanel()
+    {
+        if (questPanel != null)
+        {
+            questPanel.SetActive(!questPanel.activeSelf);
         }
     }
 
