@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Linq; // Thêm directive này
 
 [System.Serializable]
 public class Inventory
@@ -21,32 +22,18 @@ public class Inventory
             maxAllowed = 99;
         }
 
-        public bool IsEmpty
-        {
-            get
-            {
-                if (itemName == "" && count == 0)
-                {
-                    return true;
-                }
-                return false;
-            }
-        }
+        public bool IsEmpty => itemName == "" && count == 0;
 
         public bool CanAddItem(string itemName)
         {
-            if (this.itemName == itemName && count < maxAllowed)
-            {
-                return true;
-            }
-            return false;
+            return this.itemName == itemName && count < maxAllowed;
         }
 
         public void AddItem(Item item)
         {
-            this.itemName = item.data.itemName;
-            this.icon = item.data.icon;
-            this.itemData = item.data;
+            itemName = item.Data.itemName; // Sử dụng item.Data
+            icon = item.Data.icon;
+            itemData = item.Data;
             count++;
         }
 
@@ -68,7 +55,21 @@ public class Inventory
                 {
                     icon = null;
                     itemName = "";
-                    itemData = null; // Xóa itemData khi count = 0
+                    itemData = null;
+                }
+            }
+        }
+
+        public void RemoveItems(int amount)
+        {
+            if (count >= amount)
+            {
+                count -= amount;
+                if (count == 0)
+                {
+                    icon = null;
+                    itemName = "";
+                    itemData = null;
                 }
             }
         }
@@ -89,7 +90,7 @@ public class Inventory
     {
         foreach (Slot slot in slots)
         {
-            if (slot.itemName == item.data.itemName && slot.CanAddItem(item.data.itemName))
+            if (slot.itemName == item.Data.itemName && slot.CanAddItem(item.Data.itemName))
             {
                 slot.AddItem(item);
                 return;
@@ -97,7 +98,7 @@ public class Inventory
         }
         foreach (Slot slot in slots)
         {
-            if (slot.itemName == "")
+            if (slot.IsEmpty)
             {
                 slot.AddItem(item);
                 return;
@@ -114,23 +115,20 @@ public class Inventory
     {
         if (slots[index].count >= count)
         {
-            for (int i = 0; i < count; i++)
-            {
-                Remove(index);
-            }
+            slots[index].RemoveItems(count);
         }
     }
 
     public void MoveSlot(int fromIndex, int toIndex, Inventory toInventory, int numToMove = 1)
     {
-        if (slots != null && slots.Count > 0)
+        if (slots != null && slots.Count > 0 && toInventory?.slots != null)
         {
             Slot fromSlot = slots[fromIndex];
             Slot toSlot = toInventory.slots[toIndex];
-
-            for (int i = 0; i < numToMove; i++)
+            int moveCount = Mathf.Min(numToMove, fromSlot.count);
+            if (toSlot.IsEmpty || toSlot.CanAddItem(fromSlot.itemName))
             {
-                if (toSlot.IsEmpty || toSlot.CanAddItem(fromSlot.itemName))
+                for (int i = 0; i < moveCount; i++)
                 {
                     toSlot.AddItem(fromSlot.itemName, fromSlot.icon, fromSlot.maxAllowed, fromSlot.itemData);
                     fromSlot.RemoveItem();
@@ -141,7 +139,7 @@ public class Inventory
 
     public void SelectSlot(int index)
     {
-        if (slots != null && slots.Count > 0)
+        if (slots != null && slots.Count > index)
         {
             selectedSlot = slots[index];
         }
@@ -151,7 +149,7 @@ public class Inventory
     {
         if (slots != null && slots.Count > index && !slots[index].IsEmpty)
         {
-            if (slots[index].itemData.itemType == ItemData.ItemType.Seed) // Chỉ giảm nếu là hạt giống
+            if (slots[index].itemData.itemType == ItemData.ItemType.Seed)
             {
                 slots[index].RemoveItem();
                 Debug.Log($"Used seed at index {index}, New Count: {slots[index].count}");
@@ -161,5 +159,22 @@ public class Inventory
                 Debug.Log($"Cannot use item at index {index} as it is not a seed, Type: {slots[index].itemData?.itemType}");
             }
         }
+    }
+
+    public void IncreaseItemQuantity(string itemName)
+    {
+        foreach (Slot slot in slots)
+        {
+            if (slot.itemName == itemName && slot.count < slot.maxAllowed)
+            {
+                slot.count++;
+                return;
+            }
+        }
+    }
+
+    public bool HasFreeSlot()
+    {
+        return slots.Any(slot => slot.IsEmpty); // Sử dụng Any với LINQ
     }
 }

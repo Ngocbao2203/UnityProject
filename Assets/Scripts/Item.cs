@@ -1,14 +1,16 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Networking;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class Item : MonoBehaviour
 {
-    public ItemData data;
-
+    [SerializeField]
+    private ItemData data; // Sử dụng SerializeField để chỉnh sửa trong Editor
     [HideInInspector]
     public Rigidbody2D rb2d;
+
+    public ItemData Data => data; // Getter để truy cập an toàn
 
     private void Awake()
     {

@@ -2,7 +2,9 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+//using UnityEngine.Scripting;
 
+//[UnityEngine.Scripting.Preserve]
 public class CropInfo_UI : MonoBehaviour
 {
     public static CropInfo_UI Instance;
@@ -22,6 +24,7 @@ public class CropInfo_UI : MonoBehaviour
         HidePanel();
     }
 
+    //[UnityEngine.Scripting.Preserve]
     public void ShowCropInfo(Crop crop)
     {
         if (crop == null || crop.cropData == null)

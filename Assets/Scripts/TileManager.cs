@@ -5,14 +5,13 @@ using UnityEngine.Tilemaps;
 
 public class TileManager : MonoBehaviour
 {
-    public static TileManager Instance; // 🔁 Singleton để gọi từ Crop.cs
-
+    public static TileManager Instance;
     [Header("Tilemap & Tile Assets")]
     public Tilemap interactableMap;
     public Tile hiddenInteractableTile;
-    public Tile plowedTile;    // Summer_Plowed
-    public Tile wateredTile;   // Summer_Watered
-    public Tile interactableTile; // ✅ Thêm nếu muốn đặt lại sau khi thu hoạch
+    public Tile plowedTile; // Summer_Plowed
+    public Tile wateredTile; // Summer_Watered
+    public Tile interactableTile; // Sử dụng để reset
 
     private void Awake()
     {
@@ -26,7 +25,6 @@ public class TileManager : MonoBehaviour
             return;
         }
         DontDestroyOnLoad(gameObject);
-
         if (interactableMap == null)
         {
             Debug.LogError("[TileManager] interactableMap chưa được gán!");
@@ -36,12 +34,9 @@ public class TileManager : MonoBehaviour
     private void Start()
     {
         if (interactableMap == null) return;
-
-        // Ẩn các tile có tên Interactable_Visible → chuyển sang hidden
         foreach (var position in interactableMap.cellBounds.allPositionsWithin)
         {
             TileBase tile = interactableMap.GetTile(position);
-
             if (tile != null && tile.name == "Interactable_Visible")
             {
                 interactableMap.SetTile(position, hiddenInteractableTile);
@@ -49,26 +44,20 @@ public class TileManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Đặt tile thành đất đã cuốc (Summer_Plowed)
-    /// </summary>
     public void SetInteracted(Vector3Int position)
     {
-        if (interactableMap != null)
+        if (interactableMap != null && interactableMap.GetTile(position) == hiddenInteractableTile)
         {
             interactableMap.SetTile(position, plowedTile);
+            Debug.Log($"🪓 Đặt tile tại {position} thành Summer_Plowed");
         }
     }
 
-    /// <summary>
-    /// Đặt tile thành đất đã tưới (Summer_Watered)
-    /// </summary>
     public void SetWatered(Vector3Int position)
     {
         if (interactableMap != null)
         {
             TileBase tile = interactableMap.GetTile(position);
-
             if (tile != null && tile.name == plowedTile.name)
             {
                 interactableMap.SetTile(position, wateredTile);
@@ -77,15 +66,11 @@ public class TileManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Đặt tile thành đất khô trở lại (Summer_Plowed)
-    /// </summary>
     public void SetDry(Vector3Int position)
     {
         if (interactableMap != null)
         {
             TileBase tile = interactableMap.GetTile(position);
-
             if (tile != null && tile.name == wateredTile.name)
             {
                 interactableMap.SetTile(position, plowedTile);
@@ -98,9 +83,6 @@ public class TileManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Reset ô đất về Interactable sau khi thu hoạch
-    /// </summary>
     public void ResetTile(Vector3Int position)
     {
         if (interactableMap != null)
@@ -110,18 +92,12 @@ public class TileManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Trả về tên của tile tại vị trí chỉ định
-    /// </summary>
     public string GetTileName(Vector3Int position)
     {
         if (interactableMap != null)
         {
             TileBase tile = interactableMap.GetTile(position);
-            if (tile != null)
-            {
-                return tile.name;
-            }
+            return tile != null ? tile.name : "";
         }
         return "";
     }

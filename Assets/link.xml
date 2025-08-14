@@ -1,0 +1,8 @@
+<linker>
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="YourNamespace.YourClass" preserve="all"/>
+    <type fullname="Crop" preserve="all"/>
+    <type fullname="CropData" preserve="all"/>
+    <type fullname="CropInfo_UI" preserve="all"/>
+  </assembly>
+</linker>

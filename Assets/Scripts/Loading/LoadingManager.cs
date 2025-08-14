@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using TMPro;
 using System.Collections;
 
 public class LoadingManager : MonoBehaviour
@@ -11,11 +10,18 @@ public class LoadingManager : MonoBehaviour
 
     void Start()
     {
-        StartCoroutine(LoadSceneAsync());
+        StartCoroutine(LoadEverything());
     }
 
-    IEnumerator LoadSceneAsync()
+    IEnumerator LoadEverything()
     {
+        // 1. Chờ AuthManager có dữ liệu user
+        if (AuthManager.Instance != null && !AuthManager.Instance.IsUserDataReady)
+        {
+            yield return StartCoroutine(AuthManager.Instance.GetCurrentUser());
+        }
+
+        // 2. Bắt đầu load scene
         AsyncOperation op = SceneManager.LoadSceneAsync(sceneToLoad);
         op.allowSceneActivation = false;
 
@@ -24,10 +30,9 @@ public class LoadingManager : MonoBehaviour
             float progress = Mathf.Clamp01(op.progress / 0.9f);
             progressBar.value = progress;
 
-            // Khi load xong 100%, tự động chuyển
             if (op.progress >= 0.9f)
             {
-                yield return new WaitForSeconds(0.5f); // chờ tí
+                yield return new WaitForSeconds(0.5f);
                 op.allowSceneActivation = true;
             }
 

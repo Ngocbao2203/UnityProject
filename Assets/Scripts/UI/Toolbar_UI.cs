@@ -4,38 +4,74 @@ using UnityEngine;
 
 public class Toolbar_UI : MonoBehaviour
 {
-    public List<Slot_UI> toolbarSlots = new List<Slot_UI>(); // Danh sách các Slot_UI cho toolbar slots
-    public Slot_UI selectedSlot; // Biến để lưu slot được chọn, công khai cho Player truy cập
+    public List<Slot_UI> toolbarSlots = new List<Slot_UI>();
+    public Slot_UI selectedSlot;
 
     private void Start()
     {
-        // Gán slotID và inventory cho từng Slot_UI
+        if (toolbarSlots == null || toolbarSlots.Count == 0)
+        {
+            Debug.LogError("Toolbar slots not assigned or empty!");
+            return;
+        }
+
+        Inventory toolbarInventory = null;
+        if (GameManager.instance != null && GameManager.instance.player != null && GameManager.instance.player.inventoryManager != null)
+        {
+            toolbarInventory = GameManager.instance.player.inventoryManager.GetInventoryByName(InventoryManager.TOOLBAR);
+        }
+        else
+        {
+            Debug.LogError("GameManager, Player, or InventoryManager not initialized!");
+            return;
+        }
+
         for (int i = 0; i < toolbarSlots.Count; i++)
         {
-            toolbarSlots[i].slotID = i;
-            toolbarSlots[i].inventory = GameManager.instance.player.inventoryManager.toolbar;
+            if (toolbarSlots[i] != null)
+            {
+                toolbarSlots[i].slotID = i;
+                toolbarSlots[i].inventory = toolbarInventory;
+            }
+            else
+            {
+                Debug.LogWarning($"Slot_UI at index {i} is null!");
+            }
         }
-        SelectSlot(0); // Chọn slot đầu tiên khi khởi động
+        SelectSlot(0);
     }
 
     private void Update()
     {
-        CheckAlphaNumericKeys(); // Kiểm tra phím số để chọn slot
-        CheckUseItem(); // Kiểm tra phím Space để kích hoạt hành động
+        CheckAlphaNumericKeys();
+        CheckUseItem();
     }
 
     public void SelectSlot(int index)
     {
-        if (toolbarSlots.Count == 7 && index >= 0 && index < toolbarSlots.Count) // Kiểm tra chỉ số hợp lệ
+        if (toolbarSlots == null || toolbarSlots.Count != 7 || index < 0 || index >= toolbarSlots.Count)
         {
-            if (selectedSlot != null)
-            {
-                selectedSlot.SetHighlight(false); // Tắt highlight slot cũ
-            }
-            selectedSlot = toolbarSlots[index];
-            selectedSlot.SetHighlight(true); // Bật highlight slot mới
+            Debug.LogWarning($"Invalid slot index {index} or toolbarSlots count {toolbarSlots.Count}!");
+            return;
+        }
 
-            GameManager.instance.player.inventoryManager.toolbar.SelectSlot(index); // Cập nhật slot trong Inventory
+        if (selectedSlot != null)
+        {
+            selectedSlot.SetHighlight(false);
+        }
+        selectedSlot = toolbarSlots[index];
+        if (selectedSlot != null)
+        {
+            selectedSlot.SetHighlight(true);
+            if (GameManager.instance != null && GameManager.instance.player != null &&
+                GameManager.instance.player.inventoryManager != null)
+            {
+                GameManager.instance.player.inventoryManager.toolbar.SelectSlot(index);
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"Selected slot at index {index} is null!");
         }
     }
 
@@ -52,13 +88,32 @@ public class Toolbar_UI : MonoBehaviour
 
     private void CheckUseItem()
     {
-        if (selectedSlot != null && Input.GetKeyDown(KeyCode.Space)) // Kích hoạt hành động chính bằng Space
+        if (selectedSlot != null && Input.GetKeyDown(KeyCode.Space))
         {
-            Player player = GameManager.instance.player;
+            Player player = GameManager.instance?.player;
             if (player != null)
             {
-                player.HandlePrimaryAction(); // Gọi phương thức công khai
+                player.HandlePrimaryAction();
             }
+            else
+            {
+                Debug.LogWarning("Player not found in GameManager!");
+            }
+        }
+    }
+
+    public void Refresh()
+    {
+        for (int i = 0; i < toolbarSlots.Count; i++)
+        {
+            if (toolbarSlots[i] != null)
+            {
+                toolbarSlots[i].UpdateSlotUI();
+            }
+        }
+        if (selectedSlot != null)
+        {
+            selectedSlot.SetHighlight(true);
         }
     }
 }

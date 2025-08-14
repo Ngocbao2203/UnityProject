@@ -7,13 +7,10 @@ public class UI_Manager : MonoBehaviour
 {
     public Dictionary<string, Inventory_UI> inventoryUIByName = new Dictionary<string, Inventory_UI>();
     public List<Inventory_UI> inventoryUIs;
-
-    public GameObject inventoryPanel;
-    public GameObject questPanel;
-
+    [SerializeField] private GameObject inventoryPanel;
+    [SerializeField] private GameObject questPanel;
     public static Slot_UI draggedSlot;
     public static Image draggedIcon;
-
     public static bool dragSingle;
 
     private void Awake()
@@ -36,18 +33,17 @@ public class UI_Manager : MonoBehaviour
         {
             ToggleInventoryUI();
         }
-
         if (Input.GetKey(KeyCode.LeftShift))
         {
             dragSingle = true;
         }
+        else if (Input.GetKeyUp(KeyCode.LeftShift)) // Chỉ đặt lại khi thả phím
+        {
+            dragSingle = false;
+        }
         if (Input.GetKeyDown(KeyCode.J))
         {
             ToggleQuestPanel();
-        }
-        else
-        {
-            dragSingle = false;
         }
     }
 
@@ -55,17 +51,14 @@ public class UI_Manager : MonoBehaviour
     {
         if (inventoryPanel != null)
         {
-            if (!inventoryPanel.activeSelf)
+            inventoryPanel.SetActive(!inventoryPanel.activeSelf);
+            if (inventoryPanel.activeSelf)
             {
-                inventoryPanel.SetActive(true);
-                RefreshInventoryUI("Backpack");
-            }
-            else
-            {
-                inventoryPanel.SetActive(false);
+                RefreshInventoryUI("Backpack"); // Làm mới Backpack khi mở
             }
         }
     }
+
     public void ToggleQuestPanel()
     {
         if (questPanel != null)
@@ -76,39 +69,47 @@ public class UI_Manager : MonoBehaviour
 
     public void RefreshInventoryUI(string inventoryName)
     {
-        if (inventoryUIByName.ContainsKey(inventoryName))
+        if (inventoryUIByName.ContainsKey(inventoryName) && inventoryUIByName[inventoryName] != null)
         {
             inventoryUIByName[inventoryName].Refresh();
+        }
+        else
+        {
+            Debug.LogWarning($"Inventory UI for {inventoryName} not found or null!");
         }
     }
 
     public void RefreshAll()
     {
-        foreach (KeyValuePair<string, Inventory_UI> keyValuePair in inventoryUIByName)
+        foreach (var ui in inventoryUIByName.Values)
         {
-            keyValuePair.Value.Refresh();
+            if (ui != null) ui.Refresh();
         }
     }
 
     public Inventory_UI GetInventoryUI(string inventoryName)
     {
-        if (inventoryUIByName.ContainsKey(inventoryName))
-        {
-            return inventoryUIByName[inventoryName];
-        }
-
-        return null;
+        return inventoryUIByName.ContainsKey(inventoryName) ? inventoryUIByName[inventoryName] : null;
     }
 
     private void Initialize()
     {
+        if (inventoryUIs == null)
+        {
+            Debug.LogError("inventoryUIs list is null!");
+            return;
+        }
+
         foreach (Inventory_UI ui in inventoryUIs)
         {
-            if (!inventoryUIByName.ContainsKey(ui.inventoryName))
+            if (ui != null && !string.IsNullOrEmpty(ui.inventoryName) && !inventoryUIByName.ContainsKey(ui.inventoryName))
             {
                 inventoryUIByName.Add(ui.inventoryName, ui);
             }
+            else if (ui == null)
+            {
+                Debug.LogWarning("Null Inventory_UI found in inventoryUIs list!");
+            }
         }
     }
-
 }
