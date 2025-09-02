@@ -10,9 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
-  m_Name: Cucumber_Seed
+  m_Name: Radish_Seed
   m_EditorClassIdentifier: 
-  itemName: Cucumber Seed
-  icon: {fileID: 1484927363220884529, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
-  cropPrefab: {fileID: 4469506211353425115, guid: 1275dd2f794b14d4badaca7182df269c, type: 3}
+  id: 64ff299f-3eca-4779-973c-1b24454a3a23
+  itemName: Radish Seed
+  description: "h\u1EA1t c\u1EE7 c\u1EA3i"
+  icon: {fileID: -5171272838537600577, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  cropPrefab: {fileID: 4469506211353425115, guid: 408403a46d68306448b8f508193b3dd8, type: 3}
   itemType: 0
+  isStackable: 1

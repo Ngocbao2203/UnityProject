@@ -10,9 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
-  m_Name: Pumpkin_Seed
+  m_Name: Corn_Seed
   m_EditorClassIdentifier: 
-  itemName: Pumpkin
-  icon: {fileID: -7299006765846471599, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
-  cropPrefab: {fileID: 4469506211353425115, guid: daf85a8188c093e479ba9a13fa41777d, type: 3}
+  id: adc15c39-777b-4f02-af72-acc666fcbe50
+  itemName: Corn Seed
+  description: "h\u1EA1t ng\xF4"
+  icon: {fileID: 3690553341567383519, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  cropPrefab: {fileID: 4469506211353425115, guid: 1bc82c2aa94e310488e3b55e3db5d084, type: 3}
   itemType: 0
+  isStackable: 1

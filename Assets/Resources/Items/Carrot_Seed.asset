@@ -10,9 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
-  m_Name: Hoe
+  m_Name: Carrot_Seed
   m_EditorClassIdentifier: 
-  itemName: Hoe
-  icon: {fileID: -2243613801348123288, guid: 02a34da572bf7474186cb5831a5d5f0f, type: 3}
-  cropPrefab: {fileID: 0}
-  itemType: 1
+  id: 3d06c8f9-8db6-4c6b-91c4-7fed82e4d93c
+  itemName: Carrot Seed
+  description: "h\u1EA1t c\xE0 r\u1ED1t"
+  icon: {fileID: 2161777497763536343, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  cropPrefab: {fileID: 4469506211353425115, guid: dae2fe58b998e4349a0338c994bb8ee4, type: 3}
+  itemType: 0
+  isStackable: 1

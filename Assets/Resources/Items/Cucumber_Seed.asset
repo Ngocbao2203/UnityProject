@@ -10,8 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
-  m_Name: Carrot
+  m_Name: Cucumber_Seed
   m_EditorClassIdentifier: 
-  itemName: Carrot
-  icon: {fileID: -1407192652626693244, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
-  cropPrefab: {fileID: 0}
+  id: d5056992-8a22-4f81-ac45-026e231b6ab4
+  itemName: Cucumber Seed
+  description: "h\u1EA1t d\u01B0a leo"
+  icon: {fileID: 1484927363220884529, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  cropPrefab: {fileID: 4469506211353425115, guid: 1275dd2f794b14d4badaca7182df269c, type: 3}
+  itemType: 0
+  isStackable: 1

@@ -20,14 +20,6 @@ public class ShopManager : MonoBehaviour
         shopUI.SetActive(false);          // Ẩn UI shop ban đầu
     }
 
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.C))
-        {
-            ToggleShop();                 // Bật/tắt shop khi nhấn C
-        }
-    }
-
     void ToggleShop()
     {
         isShopOpen = !isShopOpen;

@@ -1,115 +1,124 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class UI_Manager : MonoBehaviour
 {
-    public Dictionary<string, Inventory_UI> inventoryUIByName = new Dictionary<string, Inventory_UI>();
-    public List<Inventory_UI> inventoryUIs;
+    // ===== Inventory UI map =====
+    [SerializeField] private List<Inventory_UI> inventoryUIs = new();
+    private readonly Dictionary<string, Inventory_UI> inventoryUIByName = new();
+
+    // ===== Panels =====
     [SerializeField] private GameObject inventoryPanel;
     [SerializeField] private GameObject questPanel;
+    [SerializeField] private GameObject shopPanel;
+    [SerializeField] private GameObject tutorialPanel;
+
+    // ===== Drag state =====
     public static Slot_UI draggedSlot;
-    public static Image draggedIcon;
+    public static UnityEngine.UI.Image draggedIcon;
     public static bool dragSingle;
 
     private void Awake()
     {
-        Initialize();
+        BuildInventoryMap();
     }
 
     private void Start()
     {
-        ToggleInventoryUI();
-        if (questPanel != null)
-        {
-            questPanel.SetActive(false); // Tắt bảng Quest khi game bắt đầu
-        }
+        // Ẩn tất cả khi bắt đầu
+        CloseAllPanels();
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Tab) || Input.GetKeyDown(KeyCode.B))
+        // Phím tắt vẫn dùng được
+        if (Input.GetKeyDown(KeyCode.B) || Input.GetKeyDown(KeyCode.Tab))
         {
             ToggleInventoryUI();
         }
-        if (Input.GetKey(KeyCode.LeftShift))
-        {
-            dragSingle = true;
-        }
-        else if (Input.GetKeyUp(KeyCode.LeftShift)) // Chỉ đặt lại khi thả phím
-        {
-            dragSingle = false;
-        }
-        if (Input.GetKeyDown(KeyCode.J))
-        {
-            ToggleQuestPanel();
-        }
+
+        if (Input.GetKeyDown(KeyCode.C)) ToggleShopPanel();
+        if (Input.GetKeyDown(KeyCode.I)) ToggleTutorialPanel();
+        if (Input.GetKeyDown(KeyCode.J)) ToggleQuestPanel();
+
+        dragSingle = Input.GetKey(KeyCode.LeftShift);
     }
 
+    // ---------- Toggle Panels ----------
     public void ToggleInventoryUI()
     {
-        if (inventoryPanel != null)
-        {
-            inventoryPanel.SetActive(!inventoryPanel.activeSelf);
-            if (inventoryPanel.activeSelf)
-            {
-                RefreshInventoryUI("Backpack"); // Làm mới Backpack khi mở
-            }
-        }
+        TogglePanel(inventoryPanel, () => RefreshInventoryUI("Backpack"));
     }
 
     public void ToggleQuestPanel()
     {
-        if (questPanel != null)
+        TogglePanel(questPanel);
+    }
+
+    public void ToggleShopPanel()
+    {
+        TogglePanel(shopPanel);
+    }
+
+    public void ToggleTutorialPanel()
+    {
+        TogglePanel(tutorialPanel);
+    }
+
+    private void TogglePanel(GameObject panel, System.Action afterOpen = null)
+    {
+        if (!panel) return;
+
+        bool willOpen = !panel.activeSelf;
+        CloseAllPanels();
+
+        if (willOpen)
         {
-            questPanel.SetActive(!questPanel.activeSelf);
+            panel.SetActive(true);
+            afterOpen?.Invoke();
+            Debug.Log($"[UI] Open {panel.name}");
         }
     }
 
+    public void CloseAllPanels()
+    {
+        if (inventoryPanel) inventoryPanel.SetActive(false);
+        if (questPanel) questPanel.SetActive(false);
+        if (shopPanel) shopPanel.SetActive(false);
+        if (tutorialPanel) tutorialPanel.SetActive(false);
+    }
+
+    // ---------- Inventory helpers ----------
     public void RefreshInventoryUI(string inventoryName)
     {
-        if (inventoryUIByName.ContainsKey(inventoryName) && inventoryUIByName[inventoryName] != null)
-        {
-            inventoryUIByName[inventoryName].Refresh();
-        }
+        if (inventoryUIByName.TryGetValue(inventoryName, out var ui) && ui != null)
+            ui.Refresh();
         else
-        {
-            Debug.LogWarning($"Inventory UI for {inventoryName} not found or null!");
-        }
+            Debug.LogWarning($"[UI] Inventory UI '{inventoryName}' not found or null!");
     }
 
     public void RefreshAll()
     {
         foreach (var ui in inventoryUIByName.Values)
-        {
-            if (ui != null) ui.Refresh();
-        }
+            if (ui) ui.Refresh();
     }
 
     public Inventory_UI GetInventoryUI(string inventoryName)
-    {
-        return inventoryUIByName.ContainsKey(inventoryName) ? inventoryUIByName[inventoryName] : null;
-    }
+        => inventoryUIByName.TryGetValue(inventoryName, out var ui) ? ui : null;
 
-    private void Initialize()
+    private void BuildInventoryMap()
     {
-        if (inventoryUIs == null)
+        inventoryUIByName.Clear();
+        foreach (var ui in inventoryUIs)
         {
-            Debug.LogError("inventoryUIs list is null!");
-            return;
-        }
-
-        foreach (Inventory_UI ui in inventoryUIs)
-        {
-            if (ui != null && !string.IsNullOrEmpty(ui.inventoryName) && !inventoryUIByName.ContainsKey(ui.inventoryName))
-            {
+            if (!ui) continue;
+            if (!string.IsNullOrEmpty(ui.inventoryName) && !inventoryUIByName.ContainsKey(ui.inventoryName))
                 inventoryUIByName.Add(ui.inventoryName, ui);
-            }
-            else if (ui == null)
-            {
-                Debug.LogWarning("Null Inventory_UI found in inventoryUIs list!");
-            }
         }
     }
+    public void DebugBackpackClick()
+    {
+        Debug.Log(">>> Backpack Button Clicked <<<");
+    }
+
 }

@@ -12,5 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
   m_Name: Corn
   m_EditorClassIdentifier: 
+  id: 01ccb684-84ae-48c2-9d4e-90e9f1f7091c
   itemName: Corn
+  description: "ng\xF4"
   icon: {fileID: -2785801568943743307, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  cropPrefab: {fileID: 0}
+  itemType: 2
+  isStackable: 1

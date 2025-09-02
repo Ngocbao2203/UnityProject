@@ -10,8 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
-  m_Name: Radish
+  m_Name: WateringCan
   m_EditorClassIdentifier: 
-  itemName: Radish
-  icon: {fileID: 1211955454, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  id: 763a8195-532e-4f25-bef5-29f95c47a765
+  itemName: WateringCan
+  description: "B\xECnh t\u01B0\u1EDBi n\u01B0\u1EDBc"
+  icon: {fileID: -7178645108241483569, guid: 02a34da572bf7474186cb5831a5d5f0f, type: 3}
   cropPrefab: {fileID: 0}
+  itemType: 1
+  isStackable: 0

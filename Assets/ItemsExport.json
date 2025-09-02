@@ -1,0 +1,103 @@
+{
+    "exportedAt": "2025-08-26T15:22:34.7756119Z",
+    "items": [
+        {
+            "id": "877228d9-c03d-475e-a3c8-6e1a1f575efb",
+            "nameItem": "Carrot",
+            "description": "carrot",
+            "itemType": "Produce",
+            "isStackable": true
+        },
+        {
+            "id": "347e7524-36d8-41a1-ae08-5c029aa179f9",
+            "nameItem": "Carrot Seed",
+            "description": "hạt cà rốt",
+            "itemType": "Seed",
+            "isStackable": true
+        },
+        {
+            "id": "d10a90a0-c2ff-4f6e-8143-e84349ba3649",
+            "nameItem": "Corn",
+            "description": "ngô",
+            "itemType": "Produce",
+            "isStackable": true
+        },
+        {
+            "id": "dff974a6-f0fc-43c3-8ccd-b43a06725108",
+            "nameItem": "Corn Seed",
+            "description": "hạt ngô",
+            "itemType": "Seed",
+            "isStackable": true
+        },
+        {
+            "id": "a7531680-33eb-45cb-901f-ec7777686421",
+            "nameItem": "Cucumber",
+            "description": "dưa leo",
+            "itemType": "Produce",
+            "isStackable": true
+        },
+        {
+            "id": "1d5fc8e0-5611-4ccb-87f6-9706605a7c19",
+            "nameItem": "Cucumber Seed",
+            "description": "hạt dưa leo",
+            "itemType": "Seed",
+            "isStackable": true
+        },
+        {
+            "id": "c2261a0b-bbb6-4489-8de2-d650a9735cfb",
+            "nameItem": "Hoe",
+            "description": "Cuốc",
+            "itemType": "Tool",
+            "isStackable": false
+        },
+        {
+            "id": "ed4ea8e0-b1b7-4665-bcc6-0ac8bffe4003",
+            "nameItem": "Paddy",
+            "description": "lúa",
+            "itemType": "Produce",
+            "isStackable": true
+        },
+        {
+            "id": "315ac86e-b831-4fc3-9ab7-85827b0bc87c",
+            "nameItem": "Paddy Seed",
+            "description": "hạt lúa",
+            "itemType": "Seed",
+            "isStackable": true
+        },
+        {
+            "id": "d07cfc3b-53b0-4de0-b5ad-2d02fbbd1b55",
+            "nameItem": "Pumpkin",
+            "description": "Bí ngô",
+            "itemType": "Produce",
+            "isStackable": true
+        },
+        {
+            "id": "cf0e3187-022c-404e-84e3-93200a7cc1b1",
+            "nameItem": "Pumpkin Seed",
+            "description": "hạt bí ngô",
+            "itemType": "Seed",
+            "isStackable": true
+        },
+        {
+            "id": "6cce8005-13c5-44c5-9b47-363764621477",
+            "nameItem": "Radish",
+            "description": "củ cải ",
+            "itemType": "Produce",
+            "isStackable": true
+        },
+        {
+            "id": "91837012-d0d6-4409-a33e-565ebb91f74b",
+            "nameItem": "Radish Seed",
+            "description": "hạt củ cải",
+            "itemType": "Seed",
+            "isStackable": true
+        },
+        {
+            "id": "d3bc6104-24be-42f9-8d8e-e0a87dc597c4",
+            "nameItem": "WateringCan",
+            "description": "Bình tưới nước",
+            "itemType": "Tool",
+            "isStackable": false
+        }
+    ]
+}

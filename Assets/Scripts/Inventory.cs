@@ -121,6 +121,12 @@ public class Inventory
 
     public void MoveSlot(int fromIndex, int toIndex, Inventory toInventory, int numToMove = 1)
     {
+        // Tạm thời disable method này để tránh conflict với InventoryManager.MoveItem
+        Debug.LogWarning("MoveSlot is disabled. Use InventoryManager.MoveItem instead.");
+        return;
+
+        /* 
+        // Code cũ được comment out
         if (slots != null && slots.Count > 0 && toInventory?.slots != null)
         {
             Slot fromSlot = slots[fromIndex];
@@ -135,6 +141,7 @@ public class Inventory
                 }
             }
         }
+        */
     }
 
     public void SelectSlot(int index)
@@ -177,4 +184,27 @@ public class Inventory
     {
         return slots.Any(slot => slot.IsEmpty); // Sử dụng Any với LINQ
     }
+
+    public int FindFirstEmptySlotIndex()
+    {
+        for (int i = 0; i < slots.Count; i++)
+            if (slots[i].IsEmpty) return i;
+        return -1;
+    }
+
+    public int FindStackableSlotIndex(string itemName)
+    {
+        for (int i = 0; i < slots.Count; i++)
+            if (!slots[i].IsEmpty && slots[i].itemName == itemName && slots[i].count < slots[i].maxAllowed)
+                return i;
+        return -1;
+    }
+
+    public int FindBestSlotIndexForAdd(string itemName)
+    {
+        int stackIdx = FindStackableSlotIndex(itemName);
+        if (stackIdx >= 0) return stackIdx;
+        return FindFirstEmptySlotIndex();
+    }
+
 }

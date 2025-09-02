@@ -1,195 +1,218 @@
 ﻿using System.Collections;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public class Player : MonoBehaviour
 {
+    [Header("Refs")]
     public InventoryManager inventoryManager;
     public TileManager tileManager;
     public Animator animator;
-    [HideInInspector] public bool canMove = true;
     [SerializeField] private GameObject cropParent;
+
+    [Header("State")]
+    [HideInInspector] public bool canMove = true;
     [HideInInspector] public Vector2 facingDirection = Vector2.down;
 
     private void Start()
     {
-        if (GameManager.instance != null && GameManager.instance.tileManager != null)
-        {
+        // Lấy TileManager từ GameManager nếu chưa gán
+        if (tileManager == null && GameManager.instance != null)
             tileManager = GameManager.instance.tileManager;
-        }
-        else
-        {
-            Debug.LogError("TileManager not found in GameManager!");
-        }
+
+        if (tileManager == null || tileManager.interactableMap == null)
+            Debug.LogError("[Player] TileManager / InteractableMap is null!");
     }
 
-    void Update()
+    private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            HandlePrimaryAction();
-        }
-        if (Input.GetKeyDown(KeyCode.F))
-        {
-            TryHarvestCrop();
-        }
+        if (Input.GetKeyDown(KeyCode.Space)) HandlePrimaryAction();
+        if (Input.GetKeyDown(KeyCode.F)) TryHarvestCrop();
     }
 
+    // ===== Debug tiện soi nguồn userId (gọi khi cần) =====
+    private void DebugUserContext(string source)
+    {
+        string uidAuth = (AuthManager.Instance && AuthManager.Instance.IsUserDataReady)
+            ? AuthManager.Instance.GetCurrentUserId()
+            : "null";
+
+        string uidGM = (GameManager.instance != null && !string.IsNullOrEmpty(GameManager.instance.userId))
+            ? GameManager.instance.userId
+            : "null";
+
+        Debug.Log($"[UserCtx:{source}] Auth={uidAuth} | GM={uidGM}");
+    }
+
+    // === Helper: 1 nguồn sự thật → AuthManager; fallback GameManager nếu Auth chưa sẵn
+    private string ResolveUserId()
+    {
+        if (AuthManager.Instance && AuthManager.Instance.IsUserDataReady)
+            return AuthManager.Instance.GetCurrentUserId();
+
+        if (GameManager.instance && !string.IsNullOrEmpty(GameManager.instance.userId))
+            return GameManager.instance.userId;
+
+        return null; // không fallback PlayerPrefs để tránh lệch id cũ
+    }
+
+    // ================= MAIN ACTION =================
     public void HandlePrimaryAction()
     {
-        Toolbar_UI toolbarUI = FindFirstObjectByType<Toolbar_UI>();
-        if (toolbarUI == null || toolbarUI.selectedSlot == null)
-        {
-            Debug.LogWarning("[Plant] Không có slot được chọn từ Toolbar_UI!");
-            return;
-        }
-        Inventory.Slot selectedSlot = toolbarUI.selectedSlot.GetSlot();
-        if (selectedSlot == null || selectedSlot.IsEmpty)
-        {
-            Debug.LogWarning("[Plant] Slot trống hoặc không hợp lệ!");
-            return;
-        }
-        ItemData itemData = selectedSlot.itemData;
-        if (itemData == null)
-        {
-            Debug.LogWarning("⚠️ [Plant] ItemData null!");
-            return;
-        }
-        Vector3Int currentCell = Vector3Int.FloorToInt(transform.position);
-        Vector3Int targetCell = currentCell + new Vector3Int((int)facingDirection.x, (int)facingDirection.y, 0);
-        string tileName = tileManager.GetTileName(targetCell);
+        if (tileManager == null || tileManager.interactableMap == null) return;
+        if (!TryGetSelectedItem(out var itemData, out var toolbarUI, out var selectedSlot)) return;
 
-        if (itemData.itemName == "Hoe" && tileName == "Interactable")
-        {
-            Debug.Log($"🪓 Cuốc đất tại {targetCell}");
-            StartCoroutine(PerformHoeAction(targetCell));
-            return;
-        }
-        if (itemData.itemName == "WateringCan" && (tileName == "Summer_Plowed" || tileName == "Summer_Watered"))
-        {
-            Debug.Log($"💧 Tưới cây tại {targetCell}");
-            StartCoroutine(PerformWateringAction(targetCell));
-            return;
-        }
+        var targetCell = GetTargetCell();
+        if (!tileManager.interactableMap.HasTile(targetCell)) return;
+
+        var state = tileManager.GetStateByCell(targetCell);
+        var status = state != null ? state.status : TileManager.TileStatus.Hidden;
+
+        // Hoe → cuốc đất
+        if (itemData.itemName == "Hoe" && status == TileManager.TileStatus.Hidden)
+        { StartCoroutine(PerformHoeAction(targetCell)); return; }
+
+        // Watering Can → tưới
+        if (itemData.itemName == "WateringCan" &&
+            (status == TileManager.TileStatus.Plowed || status == TileManager.TileStatus.Planted || status == TileManager.TileStatus.Watered))
+        { StartCoroutine(PerformWateringAction(targetCell)); return; }
+
+        // Seed → trồng
         if (itemData.itemType == ItemData.ItemType.Seed && itemData.cropPrefab != null &&
-            (tileName == "Summer_Plowed" || tileName == "Summer_Watered"))
-        {
-            Debug.Log($"🌱 Kiểm tra trồng cây {itemData.itemName} tại {targetCell}");
-            TryPlantCrop(targetCell, itemData, tileName, toolbarUI, selectedSlot);
-            return;
-        }
-        if (itemData.cropPrefab == null)
-        {
-            Debug.LogWarning($"⚠️ [Plant] Item '{itemData.itemName}' không phải hạt giống (cropPrefab == null)");
-        }
-        if (tileName != "Summer_Plowed" && tileName != "Summer_Watered")
-        {
-            Debug.LogWarning($"⚠️ [Plant] Không thể trồng tại: {tileName}.");
-        }
+            (status == TileManager.TileStatus.Plowed || status == TileManager.TileStatus.Watered))
+        { TryPlantCrop(targetCell, itemData, toolbarUI, selectedSlot, status); return; }
     }
 
-    private IEnumerator PerformHoeAction(Vector3Int targetCell)
+    // ================= HOE =================
+    private IEnumerator PerformHoeAction(Vector3Int cell)
     {
-        canMove = false;
-        animator.SetFloat("horizontal", facingDirection.x);
-        animator.SetFloat("vertical", facingDirection.y);
-        animator.SetTrigger("UseHoe");
+        if (tileManager == null) yield break;
+
+        LockMoveAndAim();
+        if (animator) animator.SetTrigger("UseHoe");
         yield return new WaitForSeconds(0.5f);
-        tileManager.SetInteracted(targetCell);
-        canMove = true;
-    }
 
-    private IEnumerator PerformWateringAction(Vector3Int targetCell)
-    {
-        canMove = false;
-        Vector3 world = tileManager.interactableMap.GetCellCenterWorld(targetCell);
-        Collider2D col = Physics2D.OverlapCircle(world, 0.25f);
-        if (col != null && col.TryGetComponent(out Crop crop) && crop.IsWaitingForNextStage())
+        var uid = ResolveUserId();
+        if (string.IsNullOrEmpty(uid))
         {
-            Debug.LogWarning($"⚠️ [Crop] {crop.cropData.cropName} đã được tưới và đang chờ phát triển. Đừng tưới nữa!");
-            canMove = true;
+            Debug.LogError("[Player] userId is null/empty");
+            DebugUserContext("Plow");
             yield break;
         }
-        animator.SetFloat("horizontal", facingDirection.x);
-        animator.SetFloat("vertical", facingDirection.y);
-        animator.SetTrigger("UseWateringCan");
-        yield return new WaitForSeconds(0.5f);
-        if (col != null && col.TryGetComponent(out crop))
-        {
-            tileManager.SetWatered(targetCell);
-            crop.Water();
-            Debug.Log($"💦 Đã tưới cây: {crop.cropData.cropName}");
-        }
-        else if (col != null)
-        {
-            Debug.Log($"⚠️ Tìm thấy vật thể không phải Crop: {col.name}");
-        }
-        else
-        {
-            Debug.Log($"⚠️ Không tìm thấy cây nào tại {targetCell} để tưới.");
-        }
+
+        tileManager.DoPlow(cell, uid);
         canMove = true;
     }
 
-    private void TryPlantCrop(Vector3Int targetCell, ItemData itemData, string tileName, Toolbar_UI toolbarUI, Inventory.Slot selectedSlot)
+    // ================= WATER =================
+    private IEnumerator PerformWateringAction(Vector3Int cell)
     {
-        Vector3 worldPos = tileManager.interactableMap.CellToWorld(targetCell) + new Vector3(0.5f, 0.5f, 0f);
-        Collider2D existingCrop = Physics2D.OverlapCircle(worldPos, 0.5f);
-        if (existingCrop != null && existingCrop.GetComponent<Crop>() != null)
+        if (tileManager == null) yield break;
+
+        LockMoveAndAim();
+        if (animator) animator.SetTrigger("UseWateringCan");
+        yield return new WaitForSeconds(0.5f);
+
+        var uid = ResolveUserId();
+        if (string.IsNullOrEmpty(uid))
         {
-            Debug.LogWarning($"⚠️ [Plant] Đã có cây ở ô {targetCell}, không thể trồng đè!");
+            Debug.LogError("[Player] userId is null/empty");
+            DebugUserContext("Water");
+            yield break;
+        }
+
+        tileManager.DoWater(cell, uid);
+        canMove = true;
+    }
+
+    // ================= PLANT =================
+    private void TryPlantCrop(
+        Vector3Int cell,
+        ItemData itemData,
+        Toolbar_UI toolbarUI,
+        Inventory.Slot selectedSlot,
+        TileManager.TileStatus statusBeforePlant)
+    {
+        if (tileManager == null) return;
+
+        var uid = ResolveUserId();
+        if (string.IsNullOrEmpty(uid))
+        {
+            Debug.LogError("[Player] userId is null/empty");
+            DebugUserContext("Plant");
             return;
         }
-        GameObject cropGO = Instantiate(itemData.cropPrefab, worldPos, Quaternion.identity);
-        if (cropParent != null)
+
+        // Spawn crop prefab
+        var worldPos = tileManager.interactableMap.GetCellCenterWorld(cell);
+        var cropGO = Instantiate(itemData.cropPrefab, worldPos, Quaternion.identity);
+        if (cropParent) cropGO.transform.SetParent(cropParent.transform);
+
+        // Gọi API Plant (TileManager sẽ apply state theo response)
+        tileManager.DoPlant(cell, uid, itemData.id);
+
+        // Trừ hạt & sync
+        if (toolbarUI != null)
         {
-            cropGO.transform.SetParent(cropParent.transform);
-        }
-        if (tileName == "Summer_Watered" && cropGO.TryGetComponent(out Crop crop))
-        {
-            crop.Water();
-            Debug.Log("💧 [Plant] Trồng trên đất đã tưới → tính 1 lần tưới.");
-        }
-        int selectedIndex = toolbarUI.toolbarSlots.IndexOf(toolbarUI.selectedSlot);
-        if (selectedIndex >= 0)
-        {
-            InventoryManager.Instance.UseItem(InventoryManager.TOOLBAR, selectedIndex);
-            StartCoroutine(SyncAfterPlant(selectedIndex)); // Đồng bộ với backend
-            toolbarUI.selectedSlot.UpdateSlotUI();
-            Debug.Log($"🌱 Trồng thành công {itemData.itemName}, số lượng còn lại: {selectedSlot.count}");
+            int selectedIndex = toolbarUI.toolbarSlots.IndexOf(toolbarUI.selectedSlot);
+            if (selectedIndex >= 0)
+            {
+                InventoryManager.Instance.UseItem(InventoryManager.TOOLBAR, selectedIndex);
+                _ = InventoryManager.Instance.SyncInventory(InventoryManager.TOOLBAR); // fire-and-forget
+                toolbarUI.selectedSlot.UpdateSlotUI();
+            }
         }
     }
 
-    private IEnumerator SyncAfterPlant(int slotIndex)
-    {
-        yield return new WaitForSeconds(0.1f);
-        InventoryManager.Instance.SyncInventory(InventoryManager.TOOLBAR).ConfigureAwait(false);
-    }
-
+    // ================= HARVEST =================
     private void TryHarvestCrop()
     {
-        Vector3Int currentCell = Vector3Int.FloorToInt(transform.position);
-        Vector3Int targetCell = currentCell + new Vector3Int((int)facingDirection.x, (int)facingDirection.y, 0);
-        Vector3 world = tileManager.interactableMap.GetCellCenterWorld(targetCell);
-        Collider2D col = Physics2D.OverlapCircle(world, 0.25f);
-        if (col != null && col.TryGetComponent(out Crop crop))
+        if (tileManager == null) return;
+
+        var uid = ResolveUserId();
+        if (string.IsNullOrEmpty(uid))
         {
-            if (crop.IsMature())
-            {
-                Debug.Log($"🧺 Thu hoạch cây {crop.cropData.cropName}!");
-                crop.Harvest();
-                tileManager.ResetTile(targetCell);
-            }
-            else
-            {
-                Debug.Log($"🌱 Cây {crop.cropData.cropName} chưa thể thu hoạch.");
-            }
+            Debug.LogError("[Player] userId is null/empty");
+            DebugUserContext("Harvest");
+            return;
         }
-        else
+
+        var cell = GetTargetCell();
+        tileManager.DoHarvest(cell, uid);
+    }
+
+    // ================= HELPERS =================
+    private bool TryGetSelectedItem(out ItemData itemData, out Toolbar_UI toolbarUI, out Inventory.Slot selectedSlot)
+    {
+        itemData = null;
+        selectedSlot = null;
+        toolbarUI = FindFirstObjectByType<Toolbar_UI>();
+        if (toolbarUI == null || toolbarUI.selectedSlot == null) return false;
+
+        selectedSlot = toolbarUI.selectedSlot.GetSlot();
+        if (selectedSlot == null || selectedSlot.IsEmpty) return false;
+
+        itemData = selectedSlot.itemData;
+        return itemData;
+    }
+
+    private Vector3Int GetTargetCell()
+    {
+        var currentCell = Vector3Int.FloorToInt(transform.position);
+        return currentCell + new Vector3Int((int)facingDirection.x, (int)facingDirection.y, 0);
+    }
+
+    private void LockMoveAndAim()
+    {
+        canMove = false;
+        if (animator != null)
         {
-            Debug.Log("❌ Không có cây nào để thu hoạch trước mặt.");
+            animator.SetFloat("horizontal", facingDirection.x);
+            animator.SetFloat("vertical", facingDirection.y);
         }
     }
 
+    // ================= DROP ITEMS =================
     public void DropItem(Item item)
     {
         Vector2 spawnLocation = transform.position;
@@ -200,9 +223,6 @@ public class Player : MonoBehaviour
 
     public void DropItem(Item item, int numToDrop)
     {
-        for (int i = 0; i < numToDrop; i++)
-        {
-            DropItem(item);
-        }
+        for (int i = 0; i < numToDrop; i++) DropItem(item);
     }
 }

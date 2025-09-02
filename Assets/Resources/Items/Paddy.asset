@@ -10,8 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
-  m_Name: Cucumber
+  m_Name: Paddy
   m_EditorClassIdentifier: 
-  itemName: Cucumber
-  icon: {fileID: 1337806114678918342, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  id: 9afe07bb-7d52-47cd-94cb-c5d0b543b004
+  itemName: Paddy
+  description: "l\xFAa"
+  icon: {fileID: 7206217728049200231, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   cropPrefab: {fileID: 0}
+  itemType: 2
+  isStackable: 1

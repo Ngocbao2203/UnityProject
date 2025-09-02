@@ -123,13 +123,29 @@ public class Inventory_UI : MonoBehaviour
 
     public void SlotBeginDrag(Slot_UI slot)
     {
-        if (slot == null) return;
+        if (slot == null || slot.inventory.slots[slot.slotID].IsEmpty) return;
+
+        // Kiểm tra xem có đang drag rồi không để tránh duplicate calls
+        if (UI_Manager.draggedSlot != null)
+        {
+            Debug.Log("Already dragging, ignoring duplicate call");
+            return;
+        }
+
+        // Thông báo cho InventoryManager rằng đang bắt đầu drag
+        if (InventoryManager.Instance != null)
+        {
+            InventoryManager.Instance.SetDragState(true);
+        }
+
         UI_Manager.draggedSlot = slot;
         UI_Manager.draggedIcon = Instantiate(slot.itemIcon);
         UI_Manager.draggedIcon.transform.SetParent(canvas.transform);
         UI_Manager.draggedIcon.raycastTarget = false;
         UI_Manager.draggedIcon.rectTransform.sizeDelta = new Vector2(50, 50);
         MoveToMousePosition(UI_Manager.draggedIcon.gameObject);
+
+        Debug.Log($"Started dragging item: {slot.inventory.slots[slot.slotID].itemName}");
     }
 
     public void SlotDrag()
@@ -142,34 +158,103 @@ public class Inventory_UI : MonoBehaviour
 
     public void SlotEndDrag()
     {
+        Debug.Log("Ending drag operation");
+
+        // Đảm bảo cleanup được gọi
         if (UI_Manager.draggedIcon != null)
         {
             Destroy(UI_Manager.draggedIcon.gameObject);
             UI_Manager.draggedIcon = null;
         }
+
+        // Chỉ reset drag state và draggedSlot sau một khoảng thời gian ngắn
+        // để đảm bảo SlotDrop có thể hoàn thành trước
+        StartCoroutine(DelayedDragCleanup());
     }
 
-    public void SlotDrop(Slot_UI slot)
+    private IEnumerator DelayedDragCleanup()
     {
-        if (UI_Manager.draggedSlot == null || slot == null) return;
+        yield return new WaitForEndOfFrame();
 
-        if (UI_Manager.dragSingle)
+        // Thông báo cho InventoryManager rằng đã kết thúc drag
+        if (InventoryManager.Instance != null)
         {
-            UI_Manager.draggedSlot.inventory.MoveSlot(UI_Manager.draggedSlot.slotID, slot.slotID, slot.inventory);
+            InventoryManager.Instance.SetDragState(false);
+        }
+
+        // Reset dragged slot nếu không có drop thành công
+        if (UI_Manager.draggedSlot != null)
+        {
+            Debug.Log("Drag ended without successful drop - resetting");
+            UI_Manager.draggedSlot = null;
+        }
+    }
+
+    public async void SlotDrop(Slot_UI slot)
+    {
+        if (UI_Manager.draggedSlot == null || slot == null)
+        {
+            Debug.Log("Invalid drop operation");
+            return;
+        }
+
+        Debug.Log($"Dropping item from slot {UI_Manager.draggedSlot.slotID} to slot {slot.slotID}");
+
+        // Sử dụng MoveItem từ InventoryManager thay vì MoveSlot cũ
+        string fromInventoryName = GetInventoryNameFromSlot(UI_Manager.draggedSlot);
+        string toInventoryName = GetInventoryNameFromSlot(slot);
+
+        Debug.Log($"From inventory: {fromInventoryName}, To inventory: {toInventoryName}");
+        Debug.Log($"From slot: {UI_Manager.draggedSlot.slotID}, To slot: {slot.slotID}");
+        Debug.Log($"IsDragging: {InventoryManager.Instance.IsDragging()}, IsSyncing: {InventoryManager.Instance.IsSyncing()}");
+
+        // Tạm thời set drag state về false trước khi move
+        if (InventoryManager.Instance != null)
+        {
+            InventoryManager.Instance.SetDragState(false);
+        }
+
+        bool success = await InventoryManager.Instance.MoveItem(
+            fromInventoryName,
+            UI_Manager.draggedSlot.slotID,
+            toInventoryName,
+            slot.slotID
+        );
+
+        if (success)
+        {
+            Debug.Log("Item moved successfully");
+            GameManager.instance.uiManager.RefreshAll();
         }
         else
         {
-            int count = UI_Manager.draggedSlot.inventory.slots[UI_Manager.draggedSlot.slotID].count;
-            UI_Manager.draggedSlot.inventory.MoveSlot(UI_Manager.draggedSlot.slotID, slot.slotID, slot.inventory, count);
+            Debug.Log("Failed to move item - checking inventories...");
+            var fromInv = InventoryManager.Instance.GetInventoryByName(fromInventoryName);
+            var toInv = InventoryManager.Instance.GetInventoryByName(toInventoryName);
+            Debug.Log($"From inventory exists: {fromInv != null}, slots count: {fromInv?.slots?.Count}");
+            Debug.Log($"To inventory exists: {toInv != null}, slots count: {toInv?.slots?.Count}");
+            if (fromInv != null && UI_Manager.draggedSlot.slotID < fromInv.slots.Count)
+            {
+                Debug.Log($"From slot item: {fromInv.slots[UI_Manager.draggedSlot.slotID].itemName}, count: {fromInv.slots[UI_Manager.draggedSlot.slotID].count}");
+            }
         }
-        StartCoroutine(SyncAfterMove(slot.slotID));
-        GameManager.instance.uiManager.RefreshAll();
+
+        // Reset drag state
+        UI_Manager.draggedSlot = null;
     }
 
-    private IEnumerator SyncAfterMove(int slotIndex)
+    private string GetInventoryNameFromSlot(Slot_UI slot)
     {
-        yield return new WaitForSeconds(0.1f);
-        InventoryManager.Instance.SyncInventory(inventoryName).ConfigureAwait(false);
+        // Tìm inventory name từ slot
+        Inventory_UI[] inventoryUIs = FindObjectsByType<Inventory_UI>(FindObjectsSortMode.None);
+        foreach (var invUI in inventoryUIs)
+        {
+            if (invUI.slots.Contains(slot))
+            {
+                return invUI.inventoryName;
+            }
+        }
+        return this.inventoryName; // fallback
     }
 
     private void MoveToMousePosition(GameObject toMove)

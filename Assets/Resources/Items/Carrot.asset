@@ -10,8 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3a427ca83dc96ee4e8580adf7da5f919, type: 3}
-  m_Name: Pumpkin
+  m_Name: Carrot
   m_EditorClassIdentifier: 
-  itemName: Pumpken
-  icon: {fileID: 8927835903354673726, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
+  id: a5fa7243-0a97-4f82-bc29-509a4364f374
+  itemName: Carrot
+  description: carrot
+  icon: {fileID: -1407192652626693244, guid: 2b7fd818c45ea4e4ebd6a25c93e731b4, type: 3}
   cropPrefab: {fileID: 0}
+  itemType: 2
+  isStackable: 1

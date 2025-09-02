@@ -337,7 +337,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -7507832856700747662, guid: 8fe3138e70d76a642932e322a873df10, type: 3}
+  m_Sprite: {fileID: -4314349355719926730, guid: 8699b0eb5746078499edb00a95f1ebd3, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -440,9 +440,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2810c96931b704e45856c3367390b299, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  slotID: -1
   itemIcon: {fileID: 3148985289636057124}
   quantityText: {fileID: 7447226223061857164}
   highlight: {fileID: 7789487299177950164}
+  inventory:
+    slots: []
+    selectedSlot:
+      itemName: 
+      count: 0
+      maxAllowed: 99
+      itemData: {fileID: 0}
+      icon: {fileID: 0}
 --- !u!114 &5975649825909084244
 MonoBehaviour:
   m_ObjectHideFlags: 0
