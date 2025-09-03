@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -46,6 +45,9 @@ public class TileManager : MonoBehaviour
     }
 
     private readonly Dictionary<int, TileSave> _state = new();
+
+    // ✅ Khóa chống bắn trùng request theo tileId
+    private readonly HashSet<int> _pending = new();
 
     // ================= LIFECYCLE =================
     private void Awake()
@@ -173,56 +175,160 @@ public class TileManager : MonoBehaviour
         interactableMap.SetTile(cell, tile);
     }
 
-    // ================== ACTION API (THEO ENVELOPE MỚI) ==================
+    // ================== ACTION API (ENVELOPE MỚI + DEBUG + LOCK) ==================
     public void DoPlow(Vector3Int cell, string userId)
     {
-        if (!IsInsideFarm(cell)) return;
+        if (!IsInsideFarm(cell)) { Debug.LogWarning("[DoPlow] Cell ngoài vùng farm"); return; }
         if (string.IsNullOrEmpty(userId)) { Debug.LogError("[DoPlow] userId null/empty"); return; }
 
         int id = CellToId(cell);
+        var s = GetStateById(id);
+
+        // ⛔ Nếu BE đã báo ô này Plowed/Watered/Planted thì không gửi nữa
+        if (s != null && (s.status == TileStatus.Plowed || s.status == TileStatus.Watered || s.status == TileStatus.Planted))
+        {
+            Debug.Log($"[DoPlow] tile {id} đã {s.status} → không gửi Plow");
+            return;
+        }
+
+        if (!_pending.Add(id))
+        {
+            Debug.Log($"[DoPlow] tile {id} đang pending → bỏ qua duplicate.");
+            return;
+        }
+
+        Debug.Log($"[DoPlow->REQ] userId={userId} tileId={id} statusBefore={(s != null ? s.status : TileStatus.Hidden)}");
+
         StartCoroutine(FarmlandApiClient.Plow(userId, id, env =>
         {
-            if (env != null && env.error == 0) SetPlowed(cell);
-            else Debug.LogError("[DoPlow] " + (env?.message ?? "Response invalid"));
+            try
+            {
+                Debug.Log($"[DoPlow->RESP] tileId={id} error={env?.error} msg='{env?.message}'");
+                if (env != null && env.error == 0)
+                {
+                    SetPlowed(cell);
+                    Debug.Log($"[DoPlow->APPLY] tileId={id} => Plowed");
+                }
+                else
+                {
+                    Debug.LogError("[DoPlow] " + (env?.message ?? "Response invalid"));
+                }
+            }
+            finally { _pending.Remove(id); }
         }));
     }
 
     public void DoPlant(Vector3Int cell, string userId, string seedId)
     {
-        if (!IsInsideFarm(cell)) return;
+        if (!IsInsideFarm(cell)) { Debug.LogWarning("[DoPlant] Cell ngoài vùng farm"); return; }
         if (string.IsNullOrEmpty(userId)) { Debug.LogError("[DoPlant] userId null/empty"); return; }
 
         int id = CellToId(cell);
+        var before = GetStateById(id)?.status ?? TileStatus.Hidden;
+
+        if (!_pending.Add(id))
+        {
+            Debug.Log($"[DoPlant] tile {id} pending → skip duplicate.");
+            return;
+        }
+
+        Debug.Log($"[DoPlant->REQ] userId={userId} tileId={id} seedId={seedId} statusBefore={before}");
+
         StartCoroutine(FarmlandApiClient.Plant(userId, id, seedId, env =>
         {
-            if (env != null && env.error == 0) SetPlanted(cell, seedId, 0);
-            else Debug.LogError("[DoPlant] " + (env?.message ?? "Response invalid"));
+            try
+            {
+                Debug.Log($"[DoPlant->RESP] tileId={id} error={env?.error} msg='{env?.message}'");
+                if (env != null && env.error == 0)
+                {
+                    SetPlanted(cell, seedId, 0);
+                    Debug.Log($"[DoPlant->APPLY] tileId={id} => Planted (seed={seedId})");
+                }
+                else
+                {
+                    Debug.LogError("[DoPlant] " + (env?.message ?? "Response invalid"));
+                }
+            }
+            finally
+            {
+                _pending.Remove(id);
+            }
         }));
     }
 
     public void DoWater(Vector3Int cell, string userId)
     {
-        if (!IsInsideFarm(cell)) return;
+        if (!IsInsideFarm(cell)) { Debug.LogWarning("[DoWater] Cell ngoài vùng farm"); return; }
         if (string.IsNullOrEmpty(userId)) { Debug.LogError("[DoWater] userId null/empty"); return; }
 
         int id = CellToId(cell);
+        var before = GetStateById(id)?.status ?? TileStatus.Hidden;
+
+        if (!_pending.Add(id))
+        {
+            Debug.Log($"[DoWater] tile {id} pending → skip duplicate.");
+            return;
+        }
+
+        Debug.Log($"[DoWater->REQ] userId={userId} tileId={id} statusBefore={before}");
+
         StartCoroutine(FarmlandApiClient.Water(userId, id, env =>
         {
-            if (env != null && env.error == 0) SetWatered(cell);
-            else Debug.LogError("[DoWater] " + (env?.message ?? "Response invalid"));
+            try
+            {
+                Debug.Log($"[DoWater->RESP] tileId={id} error={env?.error} msg='{env?.message}'");
+                if (env != null && env.error == 0)
+                {
+                    SetWatered(cell);
+                    Debug.Log($"[DoWater->APPLY] tileId={id} => Watered");
+                }
+                else
+                {
+                    Debug.LogError("[DoWater] " + (env?.message ?? "Response invalid"));
+                }
+            }
+            finally
+            {
+                _pending.Remove(id);
+            }
         }));
     }
 
     public void DoHarvest(Vector3Int cell, string userId)
     {
-        if (!IsInsideFarm(cell)) return;
+        if (!IsInsideFarm(cell)) { Debug.LogWarning("[DoHarvest] Cell ngoài vùng farm"); return; }
         if (string.IsNullOrEmpty(userId)) { Debug.LogError("[DoHarvest] userId null/empty"); return; }
 
         int id = CellToId(cell);
+        var before = GetStateById(id)?.status ?? TileStatus.Hidden;
+
+        if (!_pending.Add(id))
+        {
+            Debug.Log($"[DoHarvest] tile {id} pending → skip duplicate.");
+            return;
+        }
+
+        Debug.Log($"[DoHarvest->REQ] userId={userId} tileId={id} statusBefore={before}");
+
         StartCoroutine(FarmlandApiClient.Harvest(userId, id, env =>
         {
-            if (env != null && env.error == 0) SetHarvested(cell);
-            else Debug.LogError("[DoHarvest] " + (env?.message ?? "Response invalid"));
+            try
+            {
+                Debug.Log($"[DoHarvest->RESP] tileId={id} error={env?.error} msg='{env?.message}'");
+                if (env != null && env.error == 0)
+                {
+                    SetHarvested(cell);
+                    Debug.Log($"[DoHarvest->APPLY] tileId={id} => Plowed (after harvest)");
+                }
+                else
+                {
+                    Debug.LogError("[DoHarvest] " + (env?.message ?? "Response invalid"));
+                }
+            }
+            finally
+            {
+                _pending.Remove(id);
+            }
         }));
     }
 
@@ -248,6 +354,7 @@ public class TileManager : MonoBehaviour
         s.status = TileStatus.Plowed;
         s.watered = false;
         s.cropId = "";
+        if (!plowedTile) { Debug.LogError("[TileManager] plowedTile chưa gán!"); return; }
         SetTileSprite(cell, plowedTile);
     }
 
@@ -258,6 +365,7 @@ public class TileManager : MonoBehaviour
         var s = GetOrCreate(id);
         s.status = TileStatus.Watered;
         s.watered = true;
+        if (!wateredTile) { Debug.LogError("[TileManager] wateredTile chưa gán!"); return; }
         SetTileSprite(cell, wateredTile);
     }
 
@@ -291,7 +399,10 @@ public class TileManager : MonoBehaviour
         s.status = TileStatus.Hidden;
         s.cropId = "";
         s.watered = false;
-        SetTileSprite(cell, interactableTile);
+        if (interactableTile)
+            SetTileSprite(cell, interactableTile);
+        else
+            interactableMap.SetTile(cell, null); // fallback: xoá tile
     }
 
     // ================== DEBUG CLICK ==================
@@ -303,8 +414,83 @@ public class TileManager : MonoBehaviour
             if (TryWorldToCell(world, out var cell) && interactableMap.HasTile(cell))
             {
                 int id = CellToId(cell);
-                Debug.Log($"[Click] cell={cell} id={id}");
+                var s = GetStateById(id);
+                Debug.Log($"[Click] cell={cell} id={id} status={(s != null ? s.status : TileStatus.Hidden)} watered={(s != null && s.watered)} cropId={(s != null ? s.cropId : "")}");
             }
+        }
+    }
+
+    public void LoadFarm(string userId)
+    {
+        StartCoroutine(FarmlandApiClient.GetFarmlands(userId, env =>
+        {
+            if (env != null && env.error == 0 && env.data != null)
+            {
+                Debug.Log($"[TileManager] LoadFarm OK: {env.data.Length} plots");
+                foreach (var plot in env.data)
+                    ApplyPlotFromServer(plot);
+
+                interactableMap.RefreshAllTiles();
+            }
+            else
+            {
+                Debug.LogError("[TileManager] LoadFarm failed: " + (env?.message ?? "null response"));
+            }
+        }));
+    }
+    // Map dữ liệu plot từ server -> state & sprite trong game
+    private void ApplyPlotFromServer(FarmlandPlotDto plot)
+    {
+        if (plot == null) return;
+
+        int id = plot.tileId;
+        var cell = IdToCell(id);
+
+        if (!IsInsideFarm(cell))
+        {
+            Debug.LogWarning($"[ApplyPlotFromServer] tileId={id} nằm ngoài farm rect → bỏ qua.");
+            return;
+        }
+
+        // Đảm bảo có state local
+        var s = GetOrCreate(id);
+
+        // Cập nhật cờ watered từ server
+        s.watered = plot.watered;
+
+        // Chuẩn hoá status để switch
+        var st = (plot.status ?? "Empty").Trim().ToLowerInvariant();
+
+        switch (st)
+        {
+            case "empty":
+                ResetTile(cell);
+                break;
+
+            case "plowed":
+                SetPlowed(cell);
+                break;
+
+            case "watered":
+                SetWatered(cell);
+                break;
+
+            case "planted":
+                // Chưa có cropId từ BE → giữ/đặt tạm rỗng.
+                SetPlanted(cell, s.cropId ?? "", 0);
+                break;
+
+            case "harvestable":
+                // Nếu chưa có sprite riêng, tạm hiển thị như plowed (tuỳ bạn thay bằng tile thu hoạch)
+                s.status = TileStatus.Harvestable;
+                SetTileSprite(cell, plowedTile);
+                break;
+
+            default:
+                // Fallback an toàn
+                ResetTile(cell);
+                Debug.LogWarning($"[ApplyPlotFromServer] Status không nhận dạng: '{plot.status}' → reset tile.");
+                break;
         }
     }
 
