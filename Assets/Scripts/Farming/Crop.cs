@@ -24,22 +24,30 @@ public class Crop : MonoBehaviour
     private float growthTimer = 0f;
     private bool isWaitingForNextStage = false;
 
+    private void Awake()
+    {
+        // Cache sớm để các hàm được gọi trước Start() vẫn dùng được
+        spriteRenderer = GetComponent<SpriteRenderer>();
+    }
+
     private void Start()
     {
-        spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer == null)
         {
             Debug.LogError("[Crop] Thiếu SpriteRenderer!");
             return;
         }
 
-        if (cropData == null || cropData.growthStages.Length == 0)
+        if (cropData == null || cropData.growthStages == null || cropData.growthStages.Length == 0)
         {
             Debug.LogWarning("[Crop] Thiếu cropData hoặc không có sprite stages!");
             return;
         }
 
-        spriteRenderer.sprite = cropData.growthStages[0];
+        // ✅ ĐỪNG ép về [0] nữa, dùng currentStage hiện tại
+        int idx = Mathf.Clamp(currentStage, 0, cropData.growthStages.Length - 1);
+        spriteRenderer.sprite = cropData.growthStages[idx];
+        spriteRenderer.color = Color.white;
     }
 
     private void Update()
@@ -150,6 +158,58 @@ public class Crop : MonoBehaviour
                 Debug.LogWarning($"⚠️ [Crop] Không có thời gian phát triển cho stage {currentStage}");
             }
         }
+    }
+
+    public void SetStageInstant(int stage)
+    {
+        if (cropData == null || cropData.growthStages == null || cropData.growthStages.Length == 0) return;
+
+        currentStage = Mathf.Clamp(stage, 0, cropData.growthStages.Length - 1);
+        if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.sprite = cropData.growthStages[currentStage];
+            spriteRenderer.color = Color.white;
+        }
+
+        // reset các biến chờ
+        isWaitingForNextStage = false;
+        growthTimer = 0f;
+        tileSetBack = true;            // để Update có thể set đất khô nếu cần
+    }
+
+    /// <summary>
+    /// Server báo ô đang được tưới và đang đếm sang stage tiếp theo.
+    /// Nếu server có thời điểm kết thúc, truyền remainingSec (giây còn lại).
+    /// </summary>
+    public void StartWaitingFromServer(float? remainingSec = null)
+    {
+        if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
+        isWaitingForNextStage = true;
+
+        // Nếu có thời gian còn lại từ server, nội suy vào growthTimer để còn đúng nhịp
+        if (cropData != null && cropData.growthStageTimes != null && currentStage < cropData.growthStageTimes.Length)
+        {
+            float duration = Mathf.Max(0f, cropData.growthStageTimes[currentStage]);
+            if (remainingSec.HasValue)
+            {
+                float remain = Mathf.Clamp(remainingSec.Value, 0f, duration);
+                growthTimer = Mathf.Clamp(duration - remain, 0f, duration);
+            }
+            else
+            {
+                growthTimer = 0f;
+            }
+        }
+        else
+        {
+            growthTimer = 0f;
+        }
+
+        // cho cảm giác "ướt"
+        if (spriteRenderer) spriteRenderer.color = Color.gray;
+        tileSetBack = false;
+        lastWaterTime = Time.time;   // để HasBeenWatered = true một lúc
     }
 
     public bool IsWaitingForNextStage()

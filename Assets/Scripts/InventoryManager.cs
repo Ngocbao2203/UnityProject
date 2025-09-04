@@ -945,8 +945,14 @@ public class InventoryManager : MonoBehaviour
     // ======================= SYNC CORE (ƯU TIÊN itemId) =======================
     public async Task<bool> SyncInventory(string inventoryName, bool reloadAfterSync = true, bool allowCreateIfMissing = true, bool ignoreDebounce = false)
     {
-        if (!EnsureAuthReady(out var userId)) { return false; }
-        if (!inventoryByName.TryGetValue(inventoryName, out var inv)) { return false; }
+        if (!EnsureAuthReady(out var userId))
+        {
+            return false;
+        }
+        if (!inventoryByName.TryGetValue(inventoryName, out var inv))
+        {
+            return false;
+        }
 
         // Debounce
         if (!ignoreDebounce)
@@ -963,12 +969,8 @@ public class InventoryManager : MonoBehaviour
         var nonEmpty = inv.slots.Select((s, i) => new { s, i })
                                 .Where(x => !x.s.IsEmpty && x.s.itemData != null && !string.IsNullOrEmpty(x.s.itemData.id))
                                 .ToList();
-        if (nonEmpty.Count == 0)
-        {
-            return false;
-        }
 
-        // *** QUAN TRỌNG: Chỉ fetch, KHÔNG apply vào UI ***
+        // *** Fetch, KHÔNG apply vào UI ***
         var serverList = await FetchInventoryData(userId);
         var serverSnapshot = BuildServerSnapshot(serverList);
         var serverMap = await FetchServerRecordMap(userId);
@@ -976,6 +978,14 @@ public class InventoryManager : MonoBehaviour
 
         bool anyChanged = false;
 
+        // helper: gỡ mọi pending có value == rid (tránh delete lần 2)
+        void RemovePendingByRidLocal(string rid)
+        {
+            var keys = pendingMoveRidByDestKey.Where(kv => kv.Value == rid).Select(kv => kv.Key).ToList();
+            foreach (var k in keys) pendingMoveRidByDestKey.Remove(k);
+        }
+
+        // ===== PASS 1: PUT / MOVE / CREATE cho các slot còn item =====
         foreach (var x in nonEmpty)
         {
             string key = SlotKey(inventoryName, x.i);
@@ -989,23 +999,6 @@ public class InventoryManager : MonoBehaviour
                     bool sameQty = snap.quantity == x.s.count;
                     bool sameInv = string.Equals(snap.inventoryType, inventoryName, StringComparison.OrdinalIgnoreCase);
                     bool sameSlot = snap.slotIndex == x.i;
-
-                    // PATCH: nếu chỉ thay đổi quantity (cùng itemId/cùng inv/cùng slot) → recreate để né 400
-                    if (sameItem && !sameQty && sameInv && sameSlot)
-                    {
-                        var recreated = await RecreateSameSlotRecord(
-                            userId,
-                            inventoryName,
-                            x.i,
-                            x.s.itemData.id,
-                            x.s.count,
-                            serverId,
-                            key,
-                            /*quality*/ null
-                        );
-                        anyChanged |= recreated;
-                        if (recreated) continue;
-                    }
 
                     if (sameItem && sameQty && sameInv && sameSlot)
                     {
@@ -1032,25 +1025,16 @@ public class InventoryManager : MonoBehaviour
 
                         if (map2.TryGetValue(key, out var existedId))
                         {
-                            // nếu occupied bởi CHÍNH record mình đang PUT → recreate
                             if (existedId == serverId)
                             {
                                 var recreated = await RecreateSameSlotRecord(
-                                    userId,
-                                    inventoryName,
-                                    x.i,
-                                    x.s.itemData.id,
-                                    x.s.count,
-                                    serverId,
-                                    key,
-                                    /*quality*/ null
+                                    userId, inventoryName, x.i, x.s.itemData.id, x.s.count, serverId, key, null
                                 );
                                 anyChanged |= recreated;
                                 if (recreated) continue;
                             }
                             else
                             {
-                                // occupied bởi record khác → xóa record đó rồi PUT lại
                                 await DeleteRecordById(existedId);
                                 var put2 = await PutUpdateInventory(dto);
                                 anyChanged |= put2.ok;
@@ -1062,8 +1046,7 @@ public class InventoryManager : MonoBehaviour
 
                     if (IsNotExistError(put))
                     {
-                        var serverItemMapLocal = await FetchServerItemMapByItemId_All(userId);
-                        if (serverItemMapLocal.TryGetValue(x.s.itemData.id, out var info))
+                        if (serverItemMap.TryGetValue(x.s.itemData.id, out var info))
                         {
                             dto.Id = info.id;
                             var put2 = await PutUpdateInventory(dto);
@@ -1075,7 +1058,7 @@ public class InventoryManager : MonoBehaviour
                             }
                         }
 
-                        var createdId = await PostCreateInventory(userId, x.s.itemData.id, x.s.count, inventoryName, x.i /*, quality: null*/);
+                        var createdId = await PostCreateInventory(userId, x.s.itemData.id, x.s.count, inventoryName, x.i);
                         if (!string.IsNullOrEmpty(createdId))
                         {
                             anyChanged = true;
@@ -1101,7 +1084,7 @@ public class InventoryManager : MonoBehaviour
                 continue;
             }
 
-            // ----- CHƯA có record ở slot đích -----
+            // ----- Chưa có record ở slot đích → move hoặc create -----
             if (serverItemMap.TryGetValue(x.s.itemData.id, out var srvInfo))
             {
                 var dtoMove = new UpdateDto
@@ -1120,9 +1103,15 @@ public class InventoryManager : MonoBehaviour
                     anyChanged = true;
                     recordIdBySlot[key] = srvInfo.id;
 
+                    // CLEANUP pending oldRid an toàn: chỉ xóa nếu còn tồn tại trên server
                     if (pendingMoveRidByDestKey.TryGetValue(key, out var oldRid) && !string.IsNullOrEmpty(oldRid) && oldRid != srvInfo.id)
                     {
-                        await DeleteRecordById(oldRid);
+                        var fresh = await FetchServerRecordMap(userId);
+                        if (fresh.Values.Contains(oldRid))
+                        {
+                            await DeleteRecordById(oldRid);
+                        }
+                        RemovePendingByRidLocal(oldRid);
                     }
                     pendingMoveRidByDestKey.Remove(key);
                     continue;
@@ -1163,7 +1152,7 @@ public class InventoryManager : MonoBehaviour
 
             if (!allowCreateIfMissing)
             {
-                if (pendingMoveRidByDestKey.TryGetValue(key, out var oldRid))
+                if (pendingMoveRidByDestKey.TryGetValue(key, out var oldRid) && !string.IsNullOrEmpty(oldRid))
                 {
                     var serverMap2 = await FetchServerRecordMap(userId);
                     if (serverMap2.TryGetValue(key, out var existed) && existed != oldRid)
@@ -1175,8 +1164,16 @@ public class InventoryManager : MonoBehaviour
                     if (!string.IsNullOrEmpty(newId))
                     {
                         anyChanged = true;
-                        await DeleteRecordById(oldRid);
+
+                        // Chỉ DELETE oldRid nếu nó còn tồn tại ở server
+                        var fresh2 = await FetchServerRecordMap(userId);
+                        if (fresh2.Values.Contains(oldRid))
+                        {
+                            await DeleteRecordById(oldRid);
+                        }
+
                         recordIdBySlot[key] = newId;
+                        RemovePendingByRidLocal(oldRid);
                     }
                     pendingMoveRidByDestKey.Remove(key);
                 }
@@ -1191,6 +1188,32 @@ public class InventoryManager : MonoBehaviour
                         anyChanged = true;
                         recordIdBySlot[key] = createdId;
                     }
+                }
+            }
+        }
+
+        // ===== PASS 2: DELETE sweep – xoá những slot rỗng ở client nhưng còn record trên server =====
+        var emptySlots = inv.slots.Select((s, i) => new { s, i })
+                                  .Where(e => e.s.IsEmpty || e.s.count <= 0 || e.s.itemData == null || string.IsNullOrEmpty(e.s.itemData?.id))
+                                  .ToList();
+
+        if (emptySlots.Count > 0)
+        {
+            var freshMap = await FetchServerRecordMap(userId);
+            foreach (var e in emptySlots)
+            {
+                string key = SlotKey(inventoryName, e.i);
+                if (freshMap.TryGetValue(key, out var rid) && !string.IsNullOrEmpty(rid))
+                {
+                    var okDel = await DeleteRecordById(rid);
+                    anyChanged |= okDel;
+
+                    recordIdBySlot.Remove(key);
+                    pendingMoveRidByDestKey.Remove(key);
+                    RemovePendingByRidLocal(rid);
+
+                    if (serverSnapshot.TryGetValue(rid, out var snap) && !string.IsNullOrEmpty(snap.itemId))
+                        serverItemMap.Remove(snap.itemId);
                 }
             }
         }

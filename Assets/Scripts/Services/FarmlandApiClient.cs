@@ -1,30 +1,68 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 
 #region ===== Envelopes / DTOs khớp BE =====
+
+// Envelope chung cho các POST/PUT (Plow/Plant/Water/Harvest)
 [Serializable]
-public class ApiEnvelope                    // Cho Plow/Plant/Water/Harvest (data thường = null)
+public class ApiEnvelope
 {
-    public int error;                       // 0 = OK
+    public int error;          // 0 = OK
     public string message;
     public int count;
-    // public object data; // không cần map khi BE không trả data
+    // public object data;     // BE hiện không trả data cho các action => bỏ
 }
 
-// GET Farmlands trả mảng plot
+// Plot (ô ruộng) trong GetFarmlands
 [Serializable]
 public class FarmlandPlotDto
 {
-    public string id;        // optional
-    public string userId;    // optional
+    public string id;
+    public string userId;
     public int tileId;
     public bool watered;
-    public string status;    // "Empty" | "Plowed" | "Planted" | "Watered" | "Harvestable"
-    // có thể bổ sung: public string plantedAt; public string waterExpiresAt; ...
+    public string status;          // "Empty" | "Plowed" | "Planted" | ...
+    public string plantedAt;       // <- string thay vì DateTime?
+    public string createdAtUtc;    // <- string
+    public List<FarmlandCropDto> farmlandCrops;
 }
 
+// Crop (cây đang trồng) đi kèm trong plot
+[Serializable]
+public class FarmlandCropDto
+{
+    public string id;
+    public int tileId;
+    public string seedId;
+    public string userId;
+
+    public int stage;
+    public bool needsWater;
+
+    public string nextWaterDueAtUtc; // <- string
+    public string stageEndsAtUtc;    // <- string
+    public string harvestableAtUtc;  // <- string
+    public string plantedAtUtc;      // <- string
+    public string harvestedAtUtc;    // <- string
+    public bool isActive;
+
+    public ItemLiteDto item;
+}
+
+[Serializable]
+public class ItemLiteDto
+{
+    public string id;
+    public string nameItem;
+    public string description;
+    public string itemType;    // "Seed"
+    public bool isStackable;
+}
+
+// Envelope cho GET Farmlands
 [Serializable]
 public class FarmlandsEnvelope
 {
@@ -33,24 +71,22 @@ public class FarmlandsEnvelope
     public int count;
     public FarmlandPlotDto[] data;
 }
+
 #endregion
 
 public static class FarmlandApiClient
 {
-    // ===== Helpers =====
+    // ---------- Helpers ----------
     private static void LogForm(string tag, string url, WWWForm form, string method)
     {
         try
         {
-            var fields = form == null ? "null" : string.Join(", ",
-                form.headers != null ? Array.Empty<string>() : Array.Empty<string>()); // chỉ để tránh null-ref, không in headers được
             Debug.Log($"[{tag}] {method} {url} (multipart/form-data)");
         }
         catch { /* ignore */ }
     }
 
-    // Gửi multipart/form-data + Authorization
-    // Gửi multipart/form-data + Authorization
+    // multipart/form-data + Authorization
     private static IEnumerator SendForm(
         string url,
         WWWForm form,
@@ -58,11 +94,9 @@ public static class FarmlandApiClient
         Action<string> onErr = null,
         string method = UnityWebRequest.kHttpVerbPOST)
     {
-        // UnityWebRequest.Post(...) tự set content type multipart/form-data
         using var req = UnityWebRequest.Post(url, form);
-        req.method = method;                        // cho PUT/POST tuỳ endpoint
+        req.method = method;                        // PUT/POST
         req.downloadHandler = new DownloadHandlerBuffer();
-        // ❌ bỏ dòng req.chunkedTransfer = false; vì mặc định đã là false
 
         // Authorization
         var token = LocalStorageHelper.GetToken();
@@ -94,7 +128,7 @@ public static class FarmlandApiClient
         }
     }
 
-    // Gửi GET + Authorization (cho GetFarmlands)
+    // GET + Authorization (cho GetFarmlands)
     private static IEnumerator SendGet(
         string url,
         Action<FarmlandsEnvelope> onOk,
@@ -132,7 +166,7 @@ public static class FarmlandApiClient
         }
     }
 
-    // ===== Endpoints =====
+    // ---------- Endpoints ----------
 
     // GET /api/Farmland/GetFarmlands/{userId}
     public static IEnumerator GetFarmlands(string userId, Action<FarmlandsEnvelope> onDone, Action<string> onErr = null)
@@ -141,24 +175,35 @@ public static class FarmlandApiClient
         return SendGet(url, onDone, onErr ?? (e => Debug.LogError("[GetFarmlands] " + e)));
     }
 
-    // POST /api/Farmland/Plow (form: UserId, TileId)
+    // POST /api/Farmland/Plow  (form: UserId, TileId)
     public static IEnumerator Plow(string userId, int tileId, Action<ApiEnvelope> onDone)
-    {
-        var form = new WWWForm();
-        form.AddField("UserId", userId);   // PascalCase đúng theo Swagger
-        form.AddField("TileId", tileId);
-        return SendForm(ApiRoutes.Farmland.PLOW, form, onDone, err => Debug.LogError("[Plow] " + err));
-    }
-
-    // PUT /api/Farmland/Plant  (nếu Swagger là POST thì đổi method ở dưới)
-    public static IEnumerator Plant(string userId, int tileId, string seedId, Action<ApiEnvelope> onDone)
     {
         var form = new WWWForm();
         form.AddField("UserId", userId);
         form.AddField("TileId", tileId);
-        form.AddField("SeedId", seedId);
-        // nếu BE để POST: đổi UnityWebRequest.kHttpVerbPUT -> UnityWebRequest.kHttpVerbPOST
-        return SendForm(ApiRoutes.Farmland.PLANT, form, onDone, err => Debug.LogError("[Plant] " + err), UnityWebRequest.kHttpVerbPUT);
+        return SendForm(ApiRoutes.Farmland.PLOW, form, onDone, err => Debug.LogError("[Plow] " + err));
+    }
+
+    // PUT /api/Farmland/Plant (form: UserId, TileId, ItemId[, NextWaterDueAtUtc])
+    public static IEnumerator Plant(
+        string userId,
+        int tileId,
+        string itemId,
+        Action<ApiEnvelope> onDone,
+        DateTime? nextWaterDueUtc = null)
+    {
+        var url = ApiRoutes.Farmland.PLANT;
+        var form = new WWWForm();
+
+        form.AddField("UserId", userId);
+        form.AddField("TileId", tileId.ToString());
+        form.AddField("ItemId", itemId);
+
+        if (nextWaterDueUtc.HasValue)
+            form.AddField("NextWaterDueAtUtc",
+                nextWaterDueUtc.Value.ToUniversalTime().ToString("o"));
+
+        yield return SendForm(url, form, onDone, err => Debug.LogError("[Plant] " + err), UnityWebRequest.kHttpVerbPUT);
     }
 
     // PUT /api/Farmland/Water

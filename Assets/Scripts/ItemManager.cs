@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps; // <-- thêm
 
 [DefaultExecutionOrder(-100)]
 [DisallowMultipleComponent]
@@ -13,6 +14,10 @@ public class ItemManager : MonoBehaviour
     [Header("Also load ItemData (fallback if Item wrapper missing)")]
     public ItemData[] itemDataAssets;
 
+    // ===== NEW: tham chiếu CropData để suy ra sprite mầm =====
+    [Header("Crop Data (drag all CropData assets here)")]
+    public CropData[] cropDatas;
+
     // Lookups for Item
     public Dictionary<string, Item> collectableItemsDict = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Item> itemsById = new();
@@ -20,6 +25,10 @@ public class ItemManager : MonoBehaviour
     // Lookups for ItemData (fallback)
     private readonly Dictionary<string, ItemData> itemDataById = new();
     private readonly Dictionary<string, ItemData> itemDataByName = new(StringComparer.OrdinalIgnoreCase);
+
+    // ===== NEW: lookups cho CropData & cache Tile mầm =====
+    private readonly Dictionary<string, CropData> cropByName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Tile> sproutTileBySeedId = new(); // seedId(normalized) -> Tile
 
     public const string RES_PATH = "Items";
 
@@ -118,9 +127,6 @@ public class ItemManager : MonoBehaviour
         {
             // If all ItemData live under Resources/Items:
             itemDataAssets = Resources.LoadAll<ItemData>(RES_PATH);
-
-            // If you spread ItemData anywhere under Resources, use this instead:
-            // itemDataAssets = Resources.LoadAll<ItemData>(""); // grabs all under Resources
         }
         if (itemDataAssets == null) itemDataAssets = Array.Empty<ItemData>();
 
@@ -149,10 +155,30 @@ public class ItemManager : MonoBehaviour
                 Debug.LogWarning($"[ItemManager] ItemData '{name ?? d.name}' missing icon.");
         }
 
-        Debug.Log($"[ItemManager] Built lookups → Item(byName={addedItemByName}, byId={addedItemById}) | ItemData(byName={addedDataByName}, byId={addedDataById})");
+        // ===== NEW: build crop lookups =====
+        BuildCropLookups();
 
+        Debug.Log($"[ItemManager] Built lookups → Item(byName={addedItemByName}, byId={addedItemById}) | ItemData(byName={addedDataByName}, byId={addedDataById})");
         if (addedItemById == 0 && addedDataById == 0)
             Debug.LogWarning($"[ItemManager] No Item or ItemData found under Resources/{RES_PATH}. Add assets or assign in Inspector.");
+    }
+
+    private void BuildCropLookups()
+    {
+        cropByName.Clear();
+        // cache mầm theo seedId có thể lệch sau khi đổi crop list ⇒ dọn lại
+        sproutTileBySeedId.Clear();
+
+        if (cropDatas == null) cropDatas = Array.Empty<CropData>();
+        foreach (var cd in cropDatas)
+        {
+            if (cd == null) continue;
+            var name = NormalizeName(cd.cropName);
+            if (string.IsNullOrEmpty(name)) continue;
+
+            if (!cropByName.ContainsKey(name))
+                cropByName.Add(name, cd);
+        }
     }
 
     // ---------- Public lookups (Item) ----------
@@ -224,6 +250,44 @@ public class ItemManager : MonoBehaviour
 
         var d = GetItemDataByName(name);
         return d != null ? d.icon : null;
+    }
+
+    // ===== NEW: Trả về Tile sprite "mầm" theo seedId / seedName =====
+    public Tile GetSproutTileBySeedIdOrName(string seedIdOrName)
+    {
+        if (string.IsNullOrWhiteSpace(seedIdOrName)) return null;
+
+        // 1) dùng cache theo id nếu có
+        var idNorm = NormalizeId(seedIdOrName);
+        if (!string.IsNullOrEmpty(idNorm) && sproutTileBySeedId.TryGetValue(idNorm, out var cached))
+            return cached;
+
+        // 2) lấy tên của seed nếu vào bằng id
+        ItemData d = GetItemDataByServerId(seedIdOrName);
+        string seedName = d != null ? d.itemName : seedIdOrName;
+
+        // 3) suy ra tên crop base = bỏ đuôi " Seed"
+        string baseName = seedName;
+        const string suffix = " Seed";
+        if (baseName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            baseName = baseName.Substring(0, baseName.Length - suffix.Length).Trim();
+
+        // 4) tìm CropData theo tên
+        if (!cropByName.TryGetValue(baseName, out var crop) || crop == null
+    || crop.growthStages == null || crop.growthStages.Length == 0)
+            return null;
+
+        var spr = crop.growthStages[0];
+        if (spr == null) return null;
+
+        var tile = ScriptableObject.CreateInstance<Tile>();
+        tile.sprite = spr;
+
+        // 6) cache theo id nếu có
+        if (!string.IsNullOrEmpty(idNorm))
+            sproutTileBySeedId[idNorm] = tile;
+
+        return tile;
     }
 
     // ---------- Editor helpers ----------
