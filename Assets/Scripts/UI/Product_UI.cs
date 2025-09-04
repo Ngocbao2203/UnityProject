@@ -17,16 +17,12 @@ public class Product_UI : MonoBehaviour
     {
         currentItem = item;
         shopManager = manager;
-        //Debug.Log($"Setting up: {item.productName}, {item.price}, Icon: {item.icon}");
 
         iconImage.sprite = item.icon;
-        //if (iconImage.sprite == null)
-        //    Debug.LogWarning("❌ iconImage.sprite is NULL!");
         nameText.text = item.productName;
-        //Debug.Log($"Name set to: {nameText.text}");
-        priceText.text = item.price.ToString() + "$";
-        //Debug.Log($"Price set to: {priceText.text}");
+        priceText.text = item.price + "$";
 
+        sellButton.onClick.RemoveAllListeners();          // <-- thêm
         sellButton.onClick.AddListener(SellItem);
     }
 

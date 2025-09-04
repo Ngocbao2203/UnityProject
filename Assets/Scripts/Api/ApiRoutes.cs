@@ -1,6 +1,6 @@
 ﻿public static class ApiRoutes
 {
-    public const string BASE_URL = "https://localhost:7254";
+    public const string BASE_URL = "https://cgpwebapi20250901190829-a7a8haa8bmecbtdm.southeastasia-01.azurewebsites.net";
 
     // ===== Auth =====
     public static class Auth
@@ -43,5 +43,22 @@
     public static class Point
     {
         public const string GET_BY_USERID = BASE_URL + "/api/Point/GetPointsByUserId/{userId}";
+    }
+
+    // ===== ShopPrice =====
+    public static class ShopPrice
+    {
+        // Read
+        public const string GET_ITEMS_SELL = BASE_URL + "/api/ShopPrice/GetItemsSell";
+        public const string GET_ITEMS_IN_BACKPACK = BASE_URL + "/api/ShopPrice/GetItemsInBackpackByUserId/{userId}";
+        public const string GET_ITEM_IN_SHOP = BASE_URL + "/api/ShopPrice/GetItemInShop/{id}";
+
+        // Manage catalog
+        public const string ADD_ITEM_TO_SHOP = BASE_URL + "/api/ShopPrice/AddItemToShop";          // POST (multipart/form-data): ItemId, Price
+        public const string UPDATE_ITEM_IN_SHOP = BASE_URL + "/api/ShopPrice/UpdateItemInShop";       // PUT (multipart/form-data): Id, Price
+        public const string REMOVE_ITEM_IN_SHOP = BASE_URL + "/api/ShopPrice/RemoveItemInShop/{id}";  // DELETE
+
+        // Sell transaction
+        public const string SELL_ITEM = BASE_URL + "/api/ShopPrice/SellItem";               // POST (multipart/form-data): UserId, ItemId, Quantity
     }
 }

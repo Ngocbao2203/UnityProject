@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Threading.Tasks;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
@@ -10,6 +11,10 @@ public class GameManager : MonoBehaviour
     [SerializeField] public TileManager tileManager;
     [SerializeField] public UI_Manager uiManager;
     [SerializeField] public Player player;
+
+    [Header("Inventory / Starter Pack")]
+    [SerializeField] public InventoryManager inventoryManager;     // NEW
+    [SerializeField] public StarterPackConfig starterPack;          // NEW (asset cấu hình quà tân thủ)
 
     [HideInInspector] public string userId;
     private const string PLAYERPREFS_USERID_KEY = "userId";
@@ -23,6 +28,9 @@ public class GameManager : MonoBehaviour
     // Hàng đợi gọi LoadFarm khi TileManager chưa sẵn sàng
     private string _pendingLoadUserId = null;
 
+    // Guard: đảm bảo pipeline sau đăng nhập (load inv + quà tân thủ) chỉ chạy 1 lần / user
+    private string _postLoginInitDoneForUserId = null;             // NEW
+
     private void Awake()
     {
         if (instance != null && instance != this) { Destroy(gameObject); return; }
@@ -33,6 +41,7 @@ public class GameManager : MonoBehaviour
         if (itemManager == null) itemManager = GetComponent<ItemManager>();
         if (tileManager == null) tileManager = GetComponent<TileManager>();
         if (uiManager == null) uiManager = GetComponent<UI_Manager>();
+        if (inventoryManager == null) inventoryManager = FindFirstObjectByType<InventoryManager>(); // NEW
         if (player == null) player = FindFirstObjectByType<Player>();
 
         if (player == null) Debug.LogWarning("[GameManager] Player not found in scene!");
@@ -43,9 +52,8 @@ public class GameManager : MonoBehaviour
             var cached = PlayerPrefs.GetString(PLAYERPREFS_USERID_KEY);
             if (!string.IsNullOrEmpty(cached))
             {
-                userId = cached;
-                Debug.Log("[GameManager] Fallback userId from PlayerPrefs: " + userId);
-                EnsureLoadFarm(userId); // sẽ tự xếp hàng nếu TileManager chưa sẵn sàng
+                Debug.Log("[GameManager] Fallback userId from PlayerPrefs: " + cached);
+                SetUserId(cached); // gọi SetUserId để thống nhất pipeline
             }
         }
 
@@ -60,7 +68,7 @@ public class GameManager : MonoBehaviour
         {
             var uid = AuthManager.Instance.GetCurrentUserId();
             if (!string.IsNullOrEmpty(uid))
-                SetUserId(uid); // SetUserId sẽ tự EnsureLoadFarm
+                SetUserId(uid); // SetUserId sẽ tự EnsureLoadFarm + pipeline inventory/quà
         }
 
         // Đăng ký lắng nghe kết quả Auth (login / refresh token …)
@@ -91,6 +99,7 @@ public class GameManager : MonoBehaviour
         if (tileManager == null) tileManager = FindFirstObjectByType<TileManager>();
         if (uiManager == null) uiManager = FindFirstObjectByType<UI_Manager>();
         if (itemManager == null) itemManager = FindFirstObjectByType<ItemManager>();
+        if (inventoryManager == null) inventoryManager = FindFirstObjectByType<InventoryManager>(); // NEW
         if (player == null) player = FindFirstObjectByType<Player>();
 
         // Nếu có pending load từ trước và giờ TileManager đã sẵn
@@ -103,12 +112,11 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>Đặt userId (ưu tiên id từ Auth) và lưu PlayerPrefs. Tự gọi EnsureLoadFarm.</summary>
+    /// <summary>Đặt userId (ưu tiên id từ Auth) và lưu PlayerPrefs. Tự gọi EnsureLoadFarm + post-login pipeline.</summary>
     public void SetUserId(string uid, bool persist = true)
     {
         if (string.IsNullOrEmpty(uid)) return;
 
-        // Không cần check changed; EnsureLoadFarm đã có guard
         userId = uid;
 
         if (persist)
@@ -118,7 +126,12 @@ public class GameManager : MonoBehaviour
         }
 
         Debug.Log("[GameManager] userId set: " + userId);
+
+        // 1) Nạp nông trại
         EnsureLoadFarm(userId);
+
+        // 2) Chạy pipeline sau đăng nhập: load inventory + cấp quà tân thủ (nếu lần đầu)
+        RunPostLoginPipeline(userId); // NEW
     }
 
     /// <summary>Lấy userId: ưu tiên AuthManager, sau đó đến biến cục bộ.</summary>
@@ -164,5 +177,55 @@ public class GameManager : MonoBehaviour
         tm.LoadFarm(uid);
         _lastLoadedUserId = uid;
         _pendingLoadUserId = null; // xoá pending nếu có
+    }
+
+    /// <summary>
+    /// Pipeline sau khi xác định user: load inventory về local và cấp Starter Pack nếu là lần đầu.
+    /// Đảm bảo chỉ chạy 1 lần cho mỗi user trong phiên chơi.
+    /// </summary>
+    private async void RunPostLoginPipeline(string uid) // NEW
+    {
+        if (string.IsNullOrEmpty(uid)) return;
+
+        if (_postLoginInitDoneForUserId == uid)
+        {
+            // đã chạy cho user này trong phiên hiện tại
+            return;
+        }
+
+        // Bind lại InventoryManager nếu cần
+        if (inventoryManager == null)
+            inventoryManager = FindFirstObjectByType<InventoryManager>();
+
+        if (inventoryManager == null)
+        {
+            Debug.LogWarning("[GameManager] RunPostLoginPipeline: InventoryManager not found.");
+            return;
+        }
+
+        _postLoginInitDoneForUserId = uid;
+
+        // 1) Load inventory về local (để UI/logic đồng bộ)
+        try
+        {
+            await inventoryManager.LoadInventoryPublic(uid, applyToLocal: true);
+        }
+        catch (System.SystemException e)
+        {
+            Debug.LogWarning("[GameManager] LoadInventory error: " + e.Message);
+        }
+
+        // 2) Cấp Starter Pack nếu là lần đầu (có starterPack asset + InventoryManager có hàm EnsureStarterPackOnFirstLogin)
+        if (starterPack != null)
+        {
+            try
+            {
+                await inventoryManager.EnsureStarterPackOnFirstLogin(starterPack, reloadAfter: true);
+            }
+            catch (System.SystemException e)
+            {
+                Debug.LogWarning("[GameManager] EnsureStarterPackOnFirstLogin error: " + e.Message);
+            }
+        }
     }
 }

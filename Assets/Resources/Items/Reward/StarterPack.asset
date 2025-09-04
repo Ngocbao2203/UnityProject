@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9878fd269bca7374db48c5291806bf7a, type: 3}
+  m_Name: StarterPack
+  m_EditorClassIdentifier: 
+  items:
+  - item: {fileID: 11400000, guid: 44b168fdc6d7d944da07cfe6151da94f, type: 2}
+    quantity: 1
+    inventoryType: Backpack
+    preferredSlot: 0
+  - item: {fileID: 11400000, guid: f962542af1592bf4e828388714699f0a, type: 2}
+    quantity: 1
+    inventoryType: Backpack
+    preferredSlot: 1
+  - item: {fileID: 11400000, guid: 066cb18811271a4489dea5a3af742fd4, type: 2}
+    quantity: 1
+    inventoryType: Backpack
+    preferredSlot: 2
+  - item: {fileID: 11400000, guid: 396c3bf811fdc514e8b2301fd566893a, type: 2}
+    quantity: 1
+    inventoryType: Backpack
+    preferredSlot: 3
+  - item: {fileID: 11400000, guid: 41e2a79d517aebe4991d9e78d57502b8, type: 2}
+    quantity: 1
+    inventoryType: Backpack
+    preferredSlot: 4
+  - item: {fileID: 11400000, guid: 224d0cf8a8b5bef43bc874a6be58aec3, type: 2}
+    quantity: 1
+    inventoryType: Backpack
+    preferredSlot: 5
+  - item: {fileID: 11400000, guid: 22f5ac3db99e2bc4283b5558f40d4445, type: 2}
+    quantity: 1
+    inventoryType: Backpack
+    preferredSlot: 6
+  - item: {fileID: 11400000, guid: 273b791344b9f1d4bbf1998a151d7c78, type: 2}
+    quantity: 1
+    inventoryType: Backpack
+    preferredSlot: 7
+  markerItemId: 00000000-0000-0000-0000-00000000C0DE
+  markerInventoryType: Backpack

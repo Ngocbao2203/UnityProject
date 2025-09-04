@@ -52,6 +52,7 @@ public class InventoryManager : MonoBehaviour
         public string error;
     }
 
+
     // ======================= SINGLETON & FIELDS =======================
     public static InventoryManager Instance { get; private set; }
 
@@ -327,55 +328,59 @@ public class InventoryManager : MonoBehaviour
 
     private void ApplyServerInventoryToLocal()
     {
-        if (isDragging) { return; }
+        if (isDragging) return;
 
         ClearAllSlots();
+        if (inventoryItems == null || inventoryItems.Count == 0) return;
 
-        if (inventoryItems == null || inventoryItems.Count == 0) { return; }
+        // dùng ItemManager an toàn
+        var im = GameManager.instance ? GameManager.instance.itemManager
+                                      : FindFirstObjectByType<ItemManager>();
 
         foreach (var it in inventoryItems)
         {
-            var invName = string.Equals(it.inventoryType, TOOLBAR, StringComparison.OrdinalIgnoreCase) ? TOOLBAR : BACKPACK;
-            var inv = GetInventoryByTypeString(invName);
+            // BỎ QTY 0: coi như slot trống, không render/không map recordId
+            if (it == null || it.quantity <= 0) continue;
+
+            // Chọn inventory
+            string invName = string.Equals(it.inventoryType, TOOLBAR, StringComparison.OrdinalIgnoreCase)
+                ? TOOLBAR : BACKPACK;
+            var inv = GetInventoryByTypeString(invName) ?? backpack;
+
             int target = it.slotIndex;
+            if (target < 0 || target >= inv.slots.Count) continue;
 
-            if (inv == null)
+            // Tạo slot với đúng số lượng từ server
+            var slot = new Inventory.Slot { count = it.quantity };
+
+            // Tìm ItemData theo itemId trước, fallback theo tên
+            ItemData data = null;
+            if (im != null)
             {
-                inv = backpack;
-                invName = BACKPACK;
+                if (!string.IsNullOrEmpty(it.itemId))
+                    data = im.GetItemDataByServerId(it.itemId);
+
+                if (data == null && !string.IsNullOrEmpty(it.itemType))
+                    data = im.GetItemDataByName(it.itemType);
             }
 
-            if (target < 0 || target >= inv.slots.Count)
+            if (data != null)
             {
-                continue;
-            }
-
-            var slot = new Inventory.Slot { count = Mathf.Max(1, it.quantity) };
-
-            Item found = (!string.IsNullOrEmpty(it.itemId))
-                ? GameManager.instance.itemManager.GetItemByServerId(it.itemId)
-                : null;
-
-            if (found != null && found.Data != null)
-            {
-                slot.itemName = found.Data.itemName;
-                slot.icon = found.Data.icon;
-                slot.itemData = found.Data;
+                slot.itemName = data.itemName;
+                slot.icon = data.icon;
+                slot.itemData = data;
             }
             else
             {
-                ItemData data = null;
-                if (!string.IsNullOrEmpty(it.itemId))
-                    data = GameManager.instance.itemManager.GetItemDataByServerId(it.itemId);
-                if (data == null && !string.IsNullOrEmpty(it.itemType))
-                    data = GameManager.instance.itemManager.GetItemDataByName(it.itemType);
-
-                if (data != null) { slot.itemName = data.itemName; slot.icon = data.icon; slot.itemData = data; }
-                else { slot.itemName = !string.IsNullOrEmpty(it.itemType) ? it.itemType : "(Unknown)"; slot.icon = null; slot.itemData = null; }
+                // vẫn cho hiển thị placeholder nếu thiếu data cục bộ
+                slot.itemName = !string.IsNullOrEmpty(it.itemType) ? it.itemType : "(Unknown)";
+                slot.icon = null;
+                slot.itemData = null;
             }
 
             inv.slots[target] = slot;
 
+            // Lưu map recordId -> slot để sync về sau
             if (!string.IsNullOrEmpty(it.id))
                 recordIdBySlot[SlotKey(invName, target)] = it.id;
         }
@@ -1352,5 +1357,164 @@ public class InventoryManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    // ======================= STARTER PACK (ONE-TIME GRANT) =======================
+    // Gọi từ GameManager sau khi có userId + tải inventory lần đầu.
+    // StarterPackConfig là ScriptableObject của bạn (định nghĩa ở file riêng).
+    public async System.Threading.Tasks.Task EnsureStarterPackOnFirstLogin(StarterPackConfig cfg, bool reloadAfter = true)
+    {
+        if (cfg == null)
+        {
+            //Debug.LogWarning("[StarterPack] no config");
+            return;
+        }
+
+        if (!EnsureAuthReady(out var userId))
+        {
+            //Debug.LogWarning("[StarterPack] abort: auth not ready");
+            return;
+        }
+
+        // Local fallback key để đánh dấu đã cấp trên thiết bị này
+        string localKey = $"starterpack:{userId}";
+
+        // 1) Đọc server, kiểm tra marker
+        var serverList = await FetchInventoryData(userId);
+
+        bool hasServerMarker = false;
+        if (!string.IsNullOrWhiteSpace(cfg.markerItemId) && !string.IsNullOrWhiteSpace(cfg.markerInventoryType))
+        {
+            hasServerMarker = serverList.Any(r =>
+                string.Equals(r.inventoryType, cfg.markerInventoryType, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.itemId, cfg.markerItemId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        bool hasLocalMarker = PlayerPrefs.GetInt(localKey, 0) == 1;
+
+        if (hasServerMarker || hasLocalMarker)
+        {
+            //Debug.Log("[StarterPack] already granted → skip");
+            return;
+        }
+
+        // 2) Tập slot đã dùng theo từng inventory để chọn slot trống
+        var usedByInv = serverList
+            .GroupBy(r => r.inventoryType, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.slotIndex).ToHashSet(), StringComparer.OrdinalIgnoreCase);
+
+        int NextFreeSlot(string invType)
+        {
+            if (!usedByInv.TryGetValue(invType, out var used))
+            {
+                used = new HashSet<int>();
+                usedByInv[invType] = used;
+            }
+            int s = 0;
+            while (used.Contains(s)) s++;
+            used.Add(s);
+            return s;
+        }
+
+        // 3) Cố gắng tạo marker trên server (idempotent) — KHÔNG abort nếu thất bại
+        bool markerCreatedOnServer = false;
+        if (!string.IsNullOrWhiteSpace(cfg.markerItemId) && !string.IsNullOrWhiteSpace(cfg.markerInventoryType))
+        {
+            int markerSlot = NextFreeSlot(cfg.markerInventoryType);
+            var markerRid = await PostCreateInventory(userId, cfg.markerItemId, 1, cfg.markerInventoryType, markerSlot);
+
+            if (!string.IsNullOrEmpty(markerRid))
+            {
+                markerCreatedOnServer = true;
+            }
+            else
+            {
+                // refetch 1 lần phòng race condition
+                serverList = await FetchInventoryData(userId);
+                hasServerMarker = serverList.Any(r =>
+                    string.Equals(r.inventoryType, cfg.markerInventoryType, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(r.itemId, cfg.markerItemId, StringComparison.OrdinalIgnoreCase));
+                markerCreatedOnServer = hasServerMarker;
+
+                if (!markerCreatedOnServer)
+                {
+                    Debug.LogWarning("[StarterPack] cannot create server marker — will grant and fallback to PlayerPrefs.");
+                }
+            }
+        }
+
+        // 4) Cấp quà theo config (skip món đã có trên server để tránh trùng)
+        int granted = 0;
+        foreach (var g in cfg.items)
+        {
+            if (g == null || g.item == null || string.IsNullOrEmpty(g.item.id))
+            {
+                //Debug.LogWarning("[StarterPack] skip invalid grant entry");
+                continue;
+            }
+
+            // Nếu server đã có sẵn item này → bỏ qua
+            bool alreadyHas = serverList.Exists(x => x.itemId == g.item.id);
+            if (alreadyHas) continue;
+
+            var inv = string.IsNullOrEmpty(g.inventoryType) ? "Backpack" : g.inventoryType;
+            int slot;
+
+            if (g.preferredSlot >= 0)
+            {
+                // nếu slot bận → chọn slot trống tiếp theo
+                if (usedByInv.TryGetValue(inv, out var used) && used.Contains(g.preferredSlot))
+                    slot = NextFreeSlot(inv);
+                else
+                {
+                    slot = g.preferredSlot;
+                    if (!usedByInv.TryGetValue(inv, out var set)) usedByInv[inv] = set = new HashSet<int>();
+                    set.Add(slot);
+                }
+            }
+            else
+            {
+                slot = NextFreeSlot(inv);
+            }
+
+            var rid = await PostCreateInventory(userId, g.item.id, Math.Max(1, g.quantity), inv, slot);
+            if (!string.IsNullOrEmpty(rid)) granted++;
+        }
+
+        // 5) Đánh dấu đã cấp 1 lần
+        if (granted > 0)
+        {
+            if (!markerCreatedOnServer)
+            {
+                PlayerPrefs.SetInt(localKey, 1);
+                PlayerPrefs.Save();
+                Debug.Log($"[StarterPack] granted {granted} items (marked by PlayerPrefs).");
+            }
+            else
+            {
+                Debug.Log($"[StarterPack] granted {granted} items (marked on server).");
+            }
+        }
+        else
+        {
+            // Không có gì để cấp: nếu không có marker server thì vẫn đánh dấu local để tránh chạy lại
+            if (!markerCreatedOnServer && PlayerPrefs.GetInt(localKey, 0) == 0)
+            {
+                PlayerPrefs.SetInt(localKey, 1);
+                PlayerPrefs.Save();
+            }
+            Debug.Log("[StarterPack] nothing to grant.");
+        }
+
+        if (reloadAfter)
+        {
+            await LoadInventory(userId, applyToLocal: true);
+        }
+    }
+
+    // ======================= PUBLIC WRAPPER (cho GameManager) =======================
+    public async System.Threading.Tasks.Task LoadInventoryPublic(string userId, bool applyToLocal = true)
+    {
+        await LoadInventory(userId, applyToLocal);
     }
 }

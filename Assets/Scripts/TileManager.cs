@@ -397,12 +397,12 @@ public class TileManager : MonoBehaviour
         var before = GetStateById(id)?.status ?? TileStatus.Hidden;
         if (!_pending.Add(id)) { Debug.Log($"[DoHarvest] tile {id} pending → skip."); return; }
 
-        Debug.Log($"[DoHarvest->REQ] userId={userId} tileId={id} statusBefore={before}");
+        //Debug.Log($"[DoHarvest->REQ] userId={userId} tileId={id} statusBefore={before}");
         StartCoroutine(FarmlandApiClient.Harvest(userId, id, env =>
         {
             try
             {
-                Debug.Log($"[DoHarvest->RESP] tileId={id} error={env?.error} msg='{env?.message}'");
+                //Debug.Log($"[DoHarvest->RESP] tileId={id} error={env?.error} msg='{env?.message}'");
                 if (env != null && env.error == 0)
                 {
                     // Nếu đang có cây và đã chín -> để Crop tự spawn item
