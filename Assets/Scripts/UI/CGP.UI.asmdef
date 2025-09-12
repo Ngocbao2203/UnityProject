@@ -1,0 +1,19 @@
+{
+    "name": "CGP.UI",
+    "rootNamespace": "CGP.UI",
+    "references": [
+        "GUID:c64a6f4d0a7ad3d45ae0ea7c5ada8a4c",
+        "GUID:037e731824b4bf14d8082a3e57ae05cf",
+        "GUID:b103bc009e2a9a949bb7e728d3790ec8",
+        "GUID:6055be8ebefd69e48b49212b09b47b2f"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

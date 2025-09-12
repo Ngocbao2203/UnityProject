@@ -14,15 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   items:
   - item: {fileID: 11400000, guid: 44b168fdc6d7d944da07cfe6151da94f, type: 2}
-    quantity: 1
+    quantity: 2
     inventoryType: Backpack
     preferredSlot: 0
   - item: {fileID: 11400000, guid: f962542af1592bf4e828388714699f0a, type: 2}
-    quantity: 1
+    quantity: 2
     inventoryType: Backpack
     preferredSlot: 1
   - item: {fileID: 11400000, guid: 066cb18811271a4489dea5a3af742fd4, type: 2}
-    quantity: 1
+    quantity: 2
     inventoryType: Backpack
     preferredSlot: 2
   - item: {fileID: 11400000, guid: 396c3bf811fdc514e8b2301fd566893a, type: 2}

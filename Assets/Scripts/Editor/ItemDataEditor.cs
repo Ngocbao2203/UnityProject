@@ -1,6 +1,7 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
+using CGP.Gameplay.Items;   // ✅ thêm dòng này để nhận ItemData
 
 [CustomEditor(typeof(ItemData))]
 public class ItemDataEditor : Editor

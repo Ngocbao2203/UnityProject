@@ -1,0 +1,16 @@
+{
+    "name": "CGP.Networking",
+    "rootNamespace": "CGP.Networking",
+    "references": [
+        "GUID:c64a6f4d0a7ad3d45ae0ea7c5ada8a4c"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

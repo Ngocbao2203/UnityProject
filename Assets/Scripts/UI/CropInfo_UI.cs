@@ -1,90 +1,105 @@
 ﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
-//using UnityEngine.Scripting;
+using CGP.Gameplay.Farming;
 
-//[UnityEngine.Scripting.Preserve]
-public class CropInfo_UI : MonoBehaviour
+namespace CGP.UI
 {
-    public static CropInfo_UI Instance;
-
-    [Header("UI Elements")]
-    public TextMeshProUGUI nameText;
-    public TextMeshProUGUI stageText;
-    public TextMeshProUGUI timeText;
-    public TextMeshProUGUI statusText;
-    public Image cropIcon;
-    private Crop currentCrop;
-    private bool isShowing = false;
-
-    private void Awake()
+    [DisallowMultipleComponent]
+    [DefaultExecutionOrder(200)]
+    public class CropInfo_UI : MonoBehaviour
     {
-        Instance = this;
-        HidePanel();
-    }
+        public static CropInfo_UI Instance;
 
-    //[UnityEngine.Scripting.Preserve]
-    public void ShowCropInfo(Crop crop)
-    {
-        if (crop == null || crop.cropData == null)
-            return;
+        [SerializeField] private RectTransform panelRoot; // có thể để trống
+        [SerializeField] private TextMeshProUGUI nameText, stageText, timeText, statusText;
+        [SerializeField] private Image cropIcon;
 
-        currentCrop = crop;
-        isShowing = true;
+        private Crop currentCrop;
+        private bool isShowing;
+        private float lastToggleTime = -999f;
+        private const float ToggleCooldown = 0.08f;
 
-        UpdateUI(crop); // Gọi hàm cập nhật UI một lần
-        gameObject.SetActive(true);
-    }
+        CanvasGroup _cg;
 
-    public void HidePanel()
-    {
-        gameObject.SetActive(false);
-    }
-    private void UpdateUI(Crop crop)
-    {
-        nameText.text = crop.cropData.cropName;
-        stageText.text = $"Giai đoạn: {crop.CurrentStage + 1}/{crop.cropData.growthStages.Length}";
-
-        if (crop.IsMature())
+        void Awake()
         {
-            statusText.text = "✅ Có thể thu hoạch";
-            timeText.text = "";
-        }
-        else if (crop.IsWaitingForNextStage())
-        {
-            statusText.text = "⏳ Đang phát triển...";
-            timeText.text = $"Còn {crop.TimeLeftToNextStage:F1}s để phát triển";
-        }
-        else if (crop.HasBeenWatered)
-        {
-            statusText.text = "💧 Đã được tưới (chưa đủ)";
-            timeText.text = "";
-        }
-        else
-        {
-            statusText.text = "💧 Chưa được tưới";
-            timeText.text = "";
+            if (Instance != this && Instance != null) { Destroy(gameObject); return; }
+            Instance = this;
+
+            if (!panelRoot) panelRoot = transform as RectTransform;
+
+            _cg = GetComponent<CanvasGroup>();
+            if (!_cg) _cg = gameObject.AddComponent<CanvasGroup>();
+
+            HideVisual(); // ẩn bằng CanvasGroup, KHÔNG SetActive(false)
+
+            var canvas = GetComponentInParent<Canvas>();
+            if (canvas) { canvas.overrideSorting = true; canvas.sortingOrder = 500; }
         }
 
-        cropIcon.sprite = crop.cropData.growthStages[crop.CurrentStage];
-    }
-    private void Update()
-    {
-        if (isShowing && currentCrop != null)
+        void OnEnable() => Crop.OnCropClicked += ShowCropInfo;
+        void OnDisable() => Crop.OnCropClicked -= ShowCropInfo;
+
+        public void ShowCropInfo(Crop crop)
         {
+            if (Time.unscaledTime - lastToggleTime < ToggleCooldown) return;
+            if (crop == null || crop.cropData == null) { HidePanel(); return; }
+
+            currentCrop = crop;
+            isShowing = true;
+            lastToggleTime = Time.unscaledTime;
+
             UpdateUI(currentCrop);
+            ShowVisual(); // thay cho SetActive(true)
         }
 
-        // ✳️ ESC để đóng
-        if (isShowing && Input.GetKeyDown(KeyCode.Escape))
+        public void HidePanel()
         {
-            HidePanel();
+            if (Time.unscaledTime - lastToggleTime < ToggleCooldown) return;
+            isShowing = false;
+            currentCrop = null;
+            lastToggleTime = Time.unscaledTime;
+            HideVisual(); // thay cho SetActive(false)
         }
 
-        if (Input.GetMouseButtonDown(1)) // 1 là chuột phải
+        void ShowVisual() { _cg.alpha = 1f; _cg.interactable = true; _cg.blocksRaycasts = true; }
+        void HideVisual() { _cg.alpha = 0f; _cg.interactable = false; _cg.blocksRaycasts = false; }
+
+        void Update()
         {
-            HidePanel();
+            if (isShowing && currentCrop) UpdateUI(currentCrop);
+            if (!isShowing) return;
+
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1)) { HidePanel(); return; }
+            if (Input.GetMouseButtonDown(0) && !IsPointerOverSelf()) HidePanel();
         }
+
+        void UpdateUI(Crop crop)
+        {
+            if (!crop || !crop.cropData) { HidePanel(); return; }
+            if (nameText) nameText.text = crop.cropData.cropName;
+            if (stageText) stageText.text = $"Giai đoạn: {crop.CurrentStage + 1}/{crop.cropData.growthStages.Length}";
+            if (crop.IsMature()) { if (statusText) statusText.text = "✅ Có thể thu hoạch"; if (timeText) timeText.text = ""; }
+            else if (crop.IsWaitingForNextStage()) { if (statusText) statusText.text = "⏳ Đang phát triển..."; if (timeText) timeText.text = $"Còn {crop.TimeLeftToNextStage:F1}s"; }
+            else if (crop.HasBeenWatered) { if (statusText) statusText.text = "💧 Đã được tưới (chưa đủ)"; if (timeText) timeText.text = ""; }
+            else { if (statusText) statusText.text = "💧 Chưa được tưới"; if (timeText) timeText.text = ""; }
+
+            if (cropIcon)
+            {
+                var stages = crop.cropData.growthStages;
+                var idx = Mathf.Clamp(crop.CurrentStage, 0, stages.Length - 1);
+                cropIcon.sprite = (stages != null && stages.Length > 0) ? stages[idx] : null;
+                cropIcon.enabled = cropIcon.sprite != null;
+            }
+        }
+
+        bool IsPointerOverSelf()
+        {
+            var cam = Camera.main;
+            return panelRoot && RectTransformUtility.RectangleContainsScreenPoint(panelRoot, Input.mousePosition, cam);
+        }
+
+        public void OnCloseButtonClicked() => HidePanel();
     }
 }

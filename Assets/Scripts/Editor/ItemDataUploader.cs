@@ -1,19 +1,20 @@
 ﻿#if UNITY_EDITOR
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
-using System.Text;
-using System.Threading.Tasks;
+using CGP.Framework;              // ApiRoutes, LocalStorageHelper
+using CGP.Gameplay.Items;        // ✅ ItemData (định nghĩa ScriptableObject của bạn)
 
 public static class ItemDataUploader
 {
     // --- Điều chỉnh nếu BE map enum khác ---
     private static int ToBackendEnum(ItemData.ItemType t) => t switch
     {
-        ItemData.ItemType.Tool    => 0,
-        ItemData.ItemType.Seed    => 1,
-        ItemData.ItemType.Crop    => 2,
-        _                         => 3 // Other
+        ItemData.ItemType.Tool   => 0,
+        ItemData.ItemType.Seed   => 1,
+        ItemData.ItemType.Crop   => 2,
+        _                        => 3 // Other
     };
 
     private static string NormalizeGuid(string s)
@@ -100,7 +101,7 @@ public static class ItemDataUploader
         f.AddField("Id", id);
         f.AddField("NameItem", nameItem);
         f.AddField("Description", description);
-        f.AddField("ItemType", itemType.ToString());         // gửi SỐ đã map
+        f.AddField("ItemType", itemType.ToString());     // gửi SỐ đã map
         f.AddField("IsStackable", isStackable ? "true" : "false");
         return f;
     }
@@ -108,7 +109,7 @@ public static class ItemDataUploader
     private static async Task<(bool ok, long statusCode, string body, string error)> PostForm(string url, WWWForm form)
     {
         using var req = UnityWebRequest.Post(url, form);
-        req.downloadHandler = new DownloadHandlerBuffer();
+        req.downloadHandler   = new DownloadHandlerBuffer();
         req.certificateHandler = new BypassCertificate();
         req.SetRequestHeader("Accept", "application/json");
 
@@ -129,8 +130,8 @@ public static class ItemDataUploader
     {
         byte[] body = form.data;
         using var req = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPUT);
-        req.uploadHandler   = new UploadHandlerRaw(body);
-        req.downloadHandler = new DownloadHandlerBuffer();
+        req.uploadHandler    = new UploadHandlerRaw(body);
+        req.downloadHandler  = new DownloadHandlerBuffer();
         req.certificateHandler = new BypassCertificate();
 
         foreach (var h in form.headers) req.SetRequestHeader(h.Key, h.Value); // Content-Type (boundary)
