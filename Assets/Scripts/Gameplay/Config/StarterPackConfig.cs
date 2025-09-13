@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using CGP.Gameplay.Items;
+using CGP.Gameplay.Inventory.Presenter;
 
 namespace CGP.Gameplay.Config
 {

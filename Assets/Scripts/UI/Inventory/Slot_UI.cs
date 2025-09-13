@@ -30,11 +30,15 @@ namespace CGP.UI
         bool _hovering;
         int _lastCount = int.MinValue;
 
+        // cache parent để lấy inventoryName khi cần
+        Inventory_UI _parentUI;
+
         void Awake()
         {
             _rt = (RectTransform)transform;
             _baseScale = _rt.localScale;
             if (highlight) highlight.SetActive(false);
+            _parentUI = GetComponentInParent<Inventory_UI>();
         }
 
         void Update()
@@ -59,25 +63,22 @@ namespace CGP.UI
                 return;
             }
 
-            // fallback resolve
-            if (s.itemData == null || s.icon == null)
+            // Fallback resolve: chỉ tra bằng tên item (KHÔNG dùng tên để tra server id)
+            if ((s.itemData == null || s.icon == null) && GameManager.instance != null)
             {
-                var im = GameManager.instance ? GameManager.instance.itemManager : null;
+                var im = GameManager.instance.itemManager;
                 if (im != null)
                 {
-                    ItemData resolved = null;
-                    if (!string.IsNullOrEmpty(s.itemName))
-                        resolved = im.GetItemDataByServerId(s.itemName) ?? im.GetItemDataByName(s.itemName);
-                    if (resolved != null)
-                    {
-                        s.itemData = resolved;
-                        s.itemName = resolved.itemName;
-                        if (s.icon == null) s.icon = resolved.icon;
-                    }
+                    if (s.itemData == null && !string.IsNullOrEmpty(s.itemName))
+                        s.itemData = im.GetItemDataByName(s.itemName);
+
+                    if (s.itemData != null && s.icon == null)
+                        s.icon = s.itemData.icon;
                 }
             }
 
-            if (_lastCount != int.MinValue && _lastCount != s.count) StartCoroutine(Pop());
+            if (_lastCount != int.MinValue && _lastCount != s.count)
+                StartCoroutine(Pop());
             _lastCount = s.count;
 
             SetItem(s);
@@ -89,7 +90,12 @@ namespace CGP.UI
 
             if (itemIcon)
             {
-                if (icon != null) { itemIcon.enabled = true; itemIcon.sprite = icon; itemIcon.color = Color.white; }
+                if (icon != null)
+                {
+                    itemIcon.enabled = true;
+                    itemIcon.sprite = icon;
+                    itemIcon.color = Color.white;
+                }
                 else itemIcon.enabled = false;
             }
 
@@ -129,17 +135,39 @@ namespace CGP.UI
             _rt.localScale = Vector3.one;
         }
 
+        // ===== Quick consume API (gọi từ chỗ khác nếu cần) =====
+        public void QuickConsume(int amount = 1)
+        {
+            var invName = _parentUI != null ? _parentUI.inventoryName : "Backpack";
+            CGP.Gameplay.Inventory.Presenter.InventoryManager.Instance?
+                .TryConsume(invName, slotID, amount);
+
+            // tự làm mới ngay để icon biến mất nếu = 0
+            UpdateSlotUI();
+        }
+
         // ===== Pointer events =====
         public void OnPointerEnter(PointerEventData e) { _hovering = true; if (highlight) highlight.SetActive(true); }
         public void OnPointerExit(PointerEventData e) { _hovering = false; if (highlight) highlight.SetActive(false); }
+
         public void OnPointerDown(PointerEventData e)
         {
+            // chỉ bắt drag khi có item
             var data = inventory != null && slotID >= 0 && slotID < (inventory?.slots?.Count ?? 0)
                 ? inventory.slots[slotID] : null;
             if (data != null && data.count > 0)
                 GetComponentInParent<Inventory_UI>()?.SlotBeginDrag(this);
         }
-        public void OnPointerUp(PointerEventData e) => GetComponentInParent<Inventory_UI>()?.SlotEndDrag();
+
+        public void OnPointerUp(PointerEventData e)
+        {
+            GetComponentInParent<Inventory_UI>()?.SlotEndDrag();
+
+            // tuỳ chọn: Right click để consume nhanh 1 item (nếu bạn muốn)
+            if (e != null && e.button == PointerEventData.InputButton.Right)
+                QuickConsume(1);
+        }
+
         public void OnDrop(PointerEventData e)
         {
             GetComponentInParent<Inventory_UI>()?.SlotDrop(this);
