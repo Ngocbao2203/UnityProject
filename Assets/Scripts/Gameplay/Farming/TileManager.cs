@@ -80,8 +80,10 @@ namespace CGP.Gameplay.Farming
         }
 
         private readonly Dictionary<int, TileSave> _state = new();
-        // KHÔNG static để không mang rác qua reload
         private readonly Dictionary<int, Crop> _cropsById = new();
+
+        // NEW: tập ô hợp lệ, chỉ những cell trong set này mới cho thao tác
+        private HashSet<Vector3Int> _allowedCells = new();
 
         private bool _ready = false;
         private string _pendingUserToLoad = null;
@@ -168,11 +170,16 @@ namespace CGP.Gameplay.Farming
                 size = new Vector2Int(bounds.size.x, bounds.size.y);
             }
 
+            // NEW: build tập ô hợp lệ từ tilemap
+            BuildAllowedCells();
+
+            // Khởi tạo state chỉ cho ô hợp lệ
             foreach (var cell in bounds.allPositionsWithin)
             {
+                if (!_allowedCells.Contains(cell)) continue;
+
                 var tile = interactableMap.GetTile(cell);
                 if (!tile) continue;
-                if (!IsInsideFarm(cell)) continue;
 
                 int id = CellToId(cell);
                 if (!_state.ContainsKey(id))
@@ -200,8 +207,6 @@ namespace CGP.Gameplay.Farming
                 _pendingUserToLoad = null;
                 LoadFarm(uid);
             }
-
-            // Sau khi đã loại bỏ cơ chế “cây ma” từ Player, không cần quét hợp nhất nữa.
         }
 
         private bool RebindTilemapIfNeeded()
@@ -213,6 +218,34 @@ namespace CGP.Gameplay.Farming
                 if (tm && tm.gameObject.name == interactableMapName) { interactableMap = tm; return true; }
 
             return false;
+        }
+
+        // ================== Allowed cells ==================
+        private void BuildAllowedCells()
+        {
+            _allowedCells = new HashSet<Vector3Int>();
+            if (!interactableMap) return;
+
+            var bounds = interactableMap.cellBounds;
+            foreach (var cell in bounds.allPositionsWithin)
+            {
+                var t = interactableMap.GetTile<TileBase>(cell);
+                if (t == null) continue;
+
+                // Nếu bạn muốn lọc đúng loại tile, đổi điều kiện tại đây:
+                // if (t == visibleInteractableTile || t == interactableTile) _allowedCells.Add(cell);
+                // Ở đây: cứ có tile là coi là ô trồng hợp lệ
+                _allowedCells.Add(cell);
+            }
+        }
+
+        private bool IsCellAllowed(Vector3Int cell)
+        {
+            if (_allowedCells != null && _allowedCells.Count > 0)
+                return _allowedCells.Contains(cell);
+
+            // Fallback theo hình chữ nhật nếu chưa build được set
+            return IsInsideFarm(cell);
         }
 
         // ================== LOAD / RELOAD FARM ==================
@@ -244,23 +277,19 @@ namespace CGP.Gameplay.Farming
 
         private void ReapplyPlots(FarmlandPlotDto[] plots)
         {
-            // Xóa crop hiện có
             foreach (var kv in _cropsById) if (kv.Value) Destroy(kv.Value.gameObject);
             _cropsById.Clear();
             _spawningNow.Clear();
 
-            // GỘP: cùng tileId -> lấy newest
             var latestByTile = new Dictionary<int, FarmlandPlotDto>();
             foreach (var p in plots)
             {
                 if (p == null) continue;
-                latestByTile[p.tileId] = p; // lần sau cùng ghi đè
+                latestByTile[p.tileId] = p;
             }
 
-            // Đổ nền ẩn bằng SetTilesBlock
             FillHidden();
 
-            // Áp lại trạng thái từ server
             foreach (var p in latestByTile.Values) ApplyPlotFromServer(p);
 
             interactableMap?.RefreshAllTiles();
@@ -268,17 +297,20 @@ namespace CGP.Gameplay.Farming
 
         private void FillHidden()
         {
-            var bounds = new BoundsInt(originCell.x, originCell.y, 0, size.x, size.y, 1);
-            int count = size.x * size.y;
+            if (_allowedCells == null || _allowedCells.Count == 0 || interactableMap == null) return;
 
-            var ground = new TileBase[count];
-            for (int i = 0; i < count; i++) ground[i] = hiddenInteractableTile;
-            interactableMap.SetTilesBlock(bounds, ground);
+            var positions = new Vector3Int[_allowedCells.Count];
+            _allowedCells.CopyTo(positions);
+
+            var ground = new TileBase[positions.Length];
+            for (int i = 0; i < ground.Length; i++) ground[i] = hiddenInteractableTile;
+
+            interactableMap.SetTiles(positions, ground);
 
             if (clearSproutTiles && cropMap != null)
             {
-                var clears = new TileBase[count]; // all null
-                cropMap.SetTilesBlock(bounds, clears);
+                var clears = new TileBase[positions.Length]; // all null
+                cropMap.SetTiles(positions, clears);
             }
         }
 
@@ -287,15 +319,13 @@ namespace CGP.Gameplay.Farming
             if (plot == null) return;
             int id = plot.tileId;
             var cell = IdToCell(id);
+            if (!IsCellAllowed(cell)) return; // <- không áp ngoài vùng
 
             var s = GetOrCreate(id);
             s.watered = plot.watered;
 
             string st = (plot.status ?? "Empty").Trim().ToLowerInvariant();
-#if UNITY_EDITOR
-            int cropsCount = plot.farmlandCrops != null ? plot.farmlandCrops.Count : 0;
-            Debug.Log($"[ApplyPlotFromServer] tileId={id} cell={cell} status='{plot.status}' watered={plot.watered} cropsCount={cropsCount}");
-#endif
+
             switch (st)
             {
                 case "empty":
@@ -304,9 +334,6 @@ namespace CGP.Gameplay.Farming
 
                 case "plowed":
                     SetPlowed(cell);
-#if UNITY_EDITOR
-                    Debug.Log("[ApplyPlotFromServer] -> PLOWED  (SetPlowed)  id=" + id);
-#endif
                     break;
 
                 case "watered":
@@ -345,7 +372,6 @@ namespace CGP.Gameplay.Farming
                         DestroyCropAt(id);
                         var crop = SpawnCrop(s.cropId, cell, s.growthStage, s.watered);
                         if (crop) _cropsById[id] = crop;
-                        else Debug.LogWarning($"[ApplyPlotFromServer] SpawnCrop FAILED at tile={id}, seedId='{s.cropId}', stage={s.growthStage}");
                         break;
                     }
 
@@ -385,31 +411,16 @@ namespace CGP.Gameplay.Farming
             try { cropMap.SetTile(cell, tile); } catch { }
         }
 
-#if UNITY_EDITOR
-        private void DebugTile(Vector3Int cell, string where)
-        {
-            var t = interactableMap ? interactableMap.GetTile<Tile>(cell) : null;
-            var tName = t ? t.name : "null";
-            var spr = (t && t.sprite) ? t.sprite.name : "null";
-            Debug.Log($"[TileDbg] {where} cell={cell} tile={tName} sprite={spr}");
-        }
-#endif
-
         private void SetGroundTile(Vector3Int cell, Tile tile)
         {
-#if UNITY_EDITOR
-            var before = interactableMap ? interactableMap.GetTile<Tile>(cell) : null;
-#endif
+            if (!IsCellAllowed(cell)) return;
             interactableMap.SetTile(cell, tile);
             SafeSetCropMap(cell, null);
-#if UNITY_EDITOR
-            Debug.Log($"[TileDbg] SetGroundTile {cell}  {before?.name ?? "null"} -> {tile?.name ?? "null"}");
-            DebugTile(cell, "After SetGroundTile");
-#endif
         }
 
         public void SetPlowed(Vector3Int cell)
         {
+            if (!IsCellAllowed(cell)) return;
             int id = CellToId(cell);
             var s = GetOrCreate(id);
             s.status = TileState.Plowed; s.watered = false; s.cropId = ""; s.growthStage = 0;
@@ -419,22 +430,18 @@ namespace CGP.Gameplay.Farming
 
         public void SetWatered(Vector3Int cell)
         {
+            if (!IsCellAllowed(cell)) return;
             int id = CellToId(cell);
             var s = GetOrCreate(id);
-
             s.watered = true;
 
-            if (s.status == TileState.Planted)
-                SetGroundTile(cell, wateredTile);
-            else
-            {
-                s.status = TileState.Watered;
-                SetGroundTile(cell, wateredTile);
-            }
+            if (s.status == TileState.Planted) SetGroundTile(cell, wateredTile);
+            else { s.status = TileState.Watered; SetGroundTile(cell, wateredTile); }
         }
 
         public void ResetTile(Vector3Int cell)
         {
+            if (!IsCellAllowed(cell)) return;
             int id = CellToId(cell);
             var s = GetOrCreate(id);
             s.status = TileState.Empty;
@@ -444,13 +451,12 @@ namespace CGP.Gameplay.Farming
 
             interactableMap.SetTile(cell, hiddenInteractableTile);
             SafeSetCropMap(cell, null);
-
             DestroyCropAt(id);
         }
 
         public bool SetDry(Vector3Int cell)
         {
-            if (!IsInsideFarm(cell)) return false;
+            if (!IsCellAllowed(cell)) return false;
 
             int id = CellToId(cell);
             var s = GetOrCreate(id);
@@ -484,6 +490,8 @@ namespace CGP.Gameplay.Farming
 
         private Crop SpawnCrop(string seedId, Vector3Int cell, int stage, bool watered)
         {
+            if (!IsCellAllowed(cell)) return null;
+
             var im = GameManager.instance ? GameManager.instance.itemManager : null;
             var itemData = im?.GetItemDataByServerId(seedId) ?? im?.GetItemDataByName(seedId);
             if (itemData == null || itemData.cropPrefab == null) return null;
@@ -492,12 +500,10 @@ namespace CGP.Gameplay.Farming
             Vector3 worldCenter = grid.GetCellCenterWorld(cell);
             worldCenter.z = -0.1f;
 
-            // Khóa chống spawn đồng thời
             if (_spawningNow.Contains(id))
                 return _cropsById.TryGetValue(id, out var waitExisted) ? waitExisted : null;
             _spawningNow.Add(id);
 
-            // Đã có -> cập nhật
             if (_cropsById.TryGetValue(id, out var existed) && existed != null)
             {
                 existed.seedId = seedId;
@@ -509,7 +515,6 @@ namespace CGP.Gameplay.Farming
                 return existed;
             }
 
-            // Chưa có -> tạo mới
             var go = Instantiate(itemData.cropPrefab, worldCenter, Quaternion.identity);
             if (cropsParent) go.transform.SetParent(cropsParent, true);
 #if UNITY_EDITOR
@@ -544,7 +549,7 @@ namespace CGP.Gameplay.Farming
 
         public TileInfo GetStateByCell(Vector3Int cell)
         {
-            if (!IsInsideFarm(cell))
+            if (!IsCellAllowed(cell))
                 return new TileInfo { status = TileStatus.Hidden, watered = false, cropId = "", growthStage = 0, id = -1 };
 
             var s = GetOrCreate(CellToId(cell));
@@ -563,13 +568,13 @@ namespace CGP.Gameplay.Farming
         // ================= LOCAL-ONLY (offline/editor) =================
         public bool DoPlow(Vector3Int cell)
         {
-            if (!IsInsideFarm(cell)) return false;
+            if (!IsCellAllowed(cell)) return false;
             SetPlowed(cell);
             return true;
         }
         public bool DoWater(Vector3Int cell)
         {
-            if (!IsInsideFarm(cell)) return false;
+            if (!IsCellAllowed(cell)) return false;
             SetWatered(cell);
             return true;
         }
@@ -577,7 +582,7 @@ namespace CGP.Gameplay.Farming
 
         public bool DoPlant(Vector3Int cell, string seedId)
         {
-            if (!IsInsideFarm(cell)) return false;
+            if (!IsCellAllowed(cell)) return false;
             int id = CellToId(cell);
             var s = GetOrCreate(id);
 
@@ -601,19 +606,11 @@ namespace CGP.Gameplay.Farming
 
         public bool DoHarvest(Vector3Int cell)
         {
-            if (!IsInsideFarm(cell)) return false;
+            if (!IsCellAllowed(cell)) return false;
 
             int tileId = CellToId(cell);
-            if (!_cropsById.TryGetValue(tileId, out var crop) || crop == null)
-            {
-                Debug.Log("[Harvest] Không có crop ở ô này.");
-                return false;
-            }
-            if (!crop.IsMature())
-            {
-                Debug.Log("[Harvest] Cây chưa chín -> không thu hoạch.");
-                return false;
-            }
+            if (!_cropsById.TryGetValue(tileId, out var crop) || crop == null) return false;
+            if (!crop.IsMature()) return false;
 
             crop.Harvest();
             return true;
@@ -622,36 +619,24 @@ namespace CGP.Gameplay.Farming
         // ================= SERVER-PERSIST (ghi DB) =================
         public void DoPlow(Vector3Int cell, string userId)
         {
-            if (!IsInsideFarm(cell) || string.IsNullOrEmpty(userId)) return;
+            if (!IsCellAllowed(cell) || string.IsNullOrEmpty(userId)) return;
             int tileId = CellToId(cell);
 
             var s = GetOrCreate(tileId);
-            if (s.status != TileState.Empty)
-            {
-                Debug.Log($"[Plow] Skip local={s.status}");
-                return;
-            }
+            if (s.status != TileState.Empty) return;
             if (!TryBeginOp(tileId)) return;
 
             StartCoroutine(FarmlandApiClient.Plow(userId, tileId, env =>
             {
                 EndOp(tileId);
-                if (env != null && env.error == 0)
-                {
-                    // Đất khô sau khi cuốc
-                    SetPlowed(cell);
-                }
-                else
-                {
-                    Debug.LogWarning($"[Plow] Rejected tile={tileId} msg={env?.message}");
-                    ReloadFarm(userId);
-                }
+                if (env != null && env.error == 0) SetPlowed(cell);
+                else ReloadFarm(userId);
             }));
         }
 
         public void DoWater(Vector3Int cell, string userId)
         {
-            if (!IsInsideFarm(cell) || string.IsNullOrEmpty(userId)) return;
+            if (!IsCellAllowed(cell) || string.IsNullOrEmpty(userId)) return;
             int tileId = CellToId(cell);
 
             StartCoroutine(FarmlandApiClient.Water(userId, tileId, env =>
@@ -659,33 +644,21 @@ namespace CGP.Gameplay.Farming
                 if (env != null && env.error == 0)
                 {
                     SetWatered(cell);
-                    if (_cropsById.TryGetValue(tileId, out var crop) && crop)
-                        crop.Water();
+                    if (_cropsById.TryGetValue(tileId, out var crop) && crop) crop.Water();
                 }
-                else
-                {
-                    Debug.LogWarning($"[Water] Server rejected tile={tileId} msg={env?.message}");
-                }
+                else { /* server reject */ }
             }));
         }
 
         public void DoPlant(Vector3Int cell, string userId, string seedId)
         {
-            if (!IsInsideFarm(cell) || string.IsNullOrEmpty(userId)) return;
+            if (!IsCellAllowed(cell) || string.IsNullOrEmpty(userId)) return;
             int tileId = CellToId(cell);
             seedId ??= "";
 
             var s = GetOrCreate(tileId);
-            if (s.status != TileState.Plowed && s.status != TileState.Watered)
-            {
-                Debug.Log($"[Plant] Skip local={s.status}");
-                return;
-            }
-            if (!string.IsNullOrEmpty(s.cropId) || s.status == TileState.Planted)
-            {
-                Debug.Log("[Plant] Skip already planted");
-                return;
-            }
+            if (s.status != TileState.Plowed && s.status != TileState.Watered) return;
+            if (!string.IsNullOrEmpty(s.cropId) || s.status == TileState.Planted) return;
             if (!TryBeginOp(tileId)) return;
 
             StartCoroutine(FarmlandApiClient.Plant(userId, tileId, seedId, env =>
@@ -704,46 +677,26 @@ namespace CGP.Gameplay.Farming
 
                     SetGroundTile(cell, s.watered ? wateredTile : plowedTile);
                 }
-                else
-                {
-                    Debug.LogWarning($"[Plant] Rejected tile={tileId} seed={seedId} msg={env?.message}");
-                    ReloadFarm(userId);
-                }
+                else ReloadFarm(userId);
             }));
         }
 
         public void DoHarvest(Vector3Int cell, string userId)
         {
-            if (!IsInsideFarm(cell) || string.IsNullOrEmpty(userId)) return;
+            if (!IsCellAllowed(cell) || string.IsNullOrEmpty(userId)) return;
 
             int tileId = CellToId(cell);
             var s = GetOrCreate(tileId);
 
-            if (!_cropsById.TryGetValue(tileId, out var crop) || crop == null)
-            {
-                Debug.Log("[Harvest] Không có crop ở ô này.");
-                return;
-            }
-            if (!crop.IsMature() && s.status != TileState.Harvestable)
-            {
-                Debug.Log("[Harvest] Cây chưa chín -> không gửi request.");
-                return;
-            }
-
+            if (!_cropsById.TryGetValue(tileId, out var crop) || crop == null) return;
+            if (!crop.IsMature() && s.status != TileState.Harvestable) return;
             if (!TryBeginOp(tileId)) return;
 
             StartCoroutine(FarmlandApiClient.Harvest(userId, tileId, env =>
             {
                 EndOp(tileId);
-                if (env != null && env.error == 0)
-                {
-                    crop.Harvest();
-                }
-                else
-                {
-                    Debug.LogWarning($"[Harvest] Rejected tile={tileId} msg={env?.message}");
-                    ReloadFarm(userId);
-                }
+                if (env != null && env.error == 0) crop.Harvest();
+                else ReloadFarm(userId);
             }));
         }
     }

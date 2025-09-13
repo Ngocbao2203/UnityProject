@@ -7,7 +7,6 @@ using CGP.Gameplay.Items;
 using CGP.Gameplay.InventorySystem;
 using CGP.Gameplay.Inventory.Presenter; // InventoryManager
 using CGP.Gameplay.Systems;             // Player
-using CGP.Gameplay.Auth;
 
 namespace CGP.UI
 {
@@ -23,15 +22,24 @@ namespace CGP.UI
         public List<Slot_UI> slots = new();
 
         [Header("FX")]
-        [SerializeField] bool animateOnRefresh = true;   // chỉ áp dụng cho refresh “toàn lưới”, KHÔNG áp cho drag-drop
+        [SerializeField] bool animateOnRefresh = true;   // fade chỉ khi full refresh
 
         Canvas _canvas;
         CanvasGroup _cg;
         Inventory _inventory;
         InventoryManager _imRef;
 
-        // suppress soft-reload ngay sau khi move (tránh double refresh từ event)
+        // chặn reload ngay sau move để tránh nháy
         float _suppressLoadedUntil = -1f;
+
+        void Awake()
+        {
+            // Đảm bảo luôn có CanvasGroup
+            if (!TryGetComponent(out _cg))
+                _cg = gameObject.AddComponent<CanvasGroup>();
+
+            _cg.alpha = 1f; // an toàn vì _cg chắc chắn tồn tại
+        }
 
         void Start()
         {
@@ -40,20 +48,17 @@ namespace CGP.UI
 
             var mgr = GameManager.instance?.player?.inventoryManager;
             if (mgr == null) { Debug.LogError("inventoryManager missing"); return; }
-
             if (!slotPrefab) { Debug.LogError("slotPrefab not assigned"); return; }
 
             _inventory = mgr.GetInventoryByName(inventoryName);
             if (_inventory == null) { Debug.LogError($"Inventory '{inventoryName}' not found"); return; }
 
-            _cg = GetComponent<CanvasGroup>();
-            if (_cg == null) _cg = gameObject.AddComponent<CanvasGroup>();
+            _cg = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
             _cg.alpha = 1f;
 
             SetupSlots();
-            Refresh(); // lần đầu có thể fade (nếu bật)
+            Refresh(); // lần đầu có thể fade
 
-            // nghe event nhưng chỉ refresh nhẹ, và có suppress
             _imRef = InventoryManager.Instance;
             if (_imRef != null) _imRef.OnInventoryLoaded += OnInventoryLoaded_Soft;
         }
@@ -63,7 +68,7 @@ namespace CGP.UI
             if (_imRef != null) _imRef.OnInventoryLoaded -= OnInventoryLoaded_Soft;
         }
 
-        // ===== Public Refresh APIs =====
+        // ---------- Public ----------
         public void Refresh() => DoRefresh(true);
         public void Refresh(bool animate) => DoRefresh(animate);
 
@@ -71,16 +76,12 @@ namespace CGP.UI
         {
             if (_inventory == null) return;
 
-            int target = _inventory.slots != null ? _inventory.slots.Count : 0;
-            AdjustSlotCount(target);
+            AdjustSlotCount(_inventory.slots?.Count ?? 0);
 
             for (int i = 0; i < slots.Count; i++)
             {
-                var s = slots[i];
-                if (!s) continue;
-                s.slotID = i;
-                s.inventory = _inventory;
-                s.UpdateSlotUI();
+                var s = slots[i]; if (!s) continue;
+                s.slotID = i; s.inventory = _inventory; s.UpdateSlotUI();
             }
 
             if (animateOnRefresh && animate && _cg != null)
@@ -89,9 +90,15 @@ namespace CGP.UI
 
         IEnumerator FadeIn()
         {
+            if (_cg == null) yield break;
             _cg.alpha = 0f;
             float t = 0f, dur = .12f;
-            while (t < dur) { t += Time.unscaledDeltaTime; _cg.alpha = Mathf.SmoothStep(0, 1, t / dur); yield return null; }
+            while (t < dur)
+            {
+                t += Time.unscaledDeltaTime;
+                _cg.alpha = Mathf.SmoothStep(0f, 1f, t / dur);
+                yield return null;
+            }
             _cg.alpha = 1f;
         }
 
@@ -116,14 +123,12 @@ namespace CGP.UI
         {
             for (int i = 0; i < slots.Count; i++)
             {
-                var s = slots[i];
-                if (!s) continue;
-                s.slotID = i;
-                s.inventory = _inventory;
+                var s = slots[i]; if (!s) continue;
+                s.slotID = i; s.inventory = _inventory;
             }
         }
 
-        // ===== Drag & Drop =====
+        // ---------- Drag & Drop ----------
         public void SlotBeginDrag(Slot_UI slot)
         {
             if (slot == null || slot.inventory == null) return;
@@ -175,19 +180,15 @@ namespace CGP.UI
 
             InventoryManager.Instance?.SetDragState(false);
 
-            bool ok = await InventoryManager.Instance.MoveItem(
-                fromInv, fromIdx, toInv, toIdx);
+            bool ok = await InventoryManager.Instance.MoveItem(fromInv, fromIdx, toInv, toIdx);
 
             if (ok)
             {
-                // chặn event reload ngay sau khi move
-                _suppressLoadedUntil = Time.unscaledTime + 0.3f;
+                _suppressLoadedUntil = Time.unscaledTime + 0.3f; // chặn reload ngay sau move
 
-                // chỉ refresh “cục bộ” các ô liên quan, KHÔNG fade
                 SoftRefresh(fromInv, fromIdx);
                 SoftRefresh(toInv, toIdx);
 
-                // nếu dính toolbar, chỉ refresh toolbar nhẹ
                 if (fromInv == InventoryManager.TOOLBAR || toInv == InventoryManager.TOOLBAR)
                     FindFirstObjectByType<Toolbar_UI>()?.Refresh();
             }
@@ -207,24 +208,18 @@ namespace CGP.UI
             }
         }
 
-        // vẽ lại đúng các index, không đụng CanvasGroup/fade, không AdjustSlotCount
+        // vẽ lại đúng các index, không fade, không đổi số lượng ô
         public void RefreshSlots(bool animate, params int[] indices)
         {
             if (_inventory == null || slots == null) return;
             if (indices == null || indices.Length == 0) return;
 
-            var uniq = indices.Distinct();
-            foreach (var i in uniq)
+            foreach (var i in indices.Distinct())
             {
                 if (i < 0 || i >= slots.Count) continue;
-                var s = slots[i];
-                if (!s) continue;
-                // đảm bảo binding đúng inventory + id
-                s.slotID = i;
-                s.inventory = _inventory;
-                s.UpdateSlotUI();
+                var s = slots[i]; if (!s) continue;
+                s.slotID = i; s.inventory = _inventory; s.UpdateSlotUI();
             }
-            // tuyệt đối KHÔNG fade ở đây
         }
 
         string GetInventoryNameFromSlot(Slot_UI slot)
@@ -244,7 +239,7 @@ namespace CGP.UI
             else go.transform.position = Vector3.Lerp(go.transform.position, world, 0.35f);
         }
 
-        // Optional: drop ra đất (giữ API cũ)
+        // Optional: drop ra đất (API cũ)
         public void Remove()
         {
             if (UI_Manager.draggedSlot == null || _inventory == null) return;
@@ -278,9 +273,8 @@ namespace CGP.UI
 
         void OnInventoryLoaded_Soft()
         {
-            // nếu vừa move xong, bỏ qua lần reload này để tránh nháy
-            if (Time.unscaledTime < _suppressLoadedUntil) return;
-            Refresh(false); // refresh nhẹ, không fade
+            if (Time.unscaledTime < _suppressLoadedUntil) return; // tránh nháy sau move
+            Refresh(false);
         }
     }
 }

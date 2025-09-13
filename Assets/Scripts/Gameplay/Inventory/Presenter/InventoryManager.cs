@@ -713,31 +713,47 @@ namespace CGP.Gameplay.Inventory.Presenter
             if (!ValidateInventories(inventoryName, out var inv)) return;
             if (slotIndex < 0 || slotIndex >= inv.slots.Count) return;
 
-            inv.Remove(slotIndex, amount);
-            if (inv.slots[slotIndex] == null) inv.slots[slotIndex] = new Slot();
+            var s = inv.slots[slotIndex];
+            if (s == null || s.IsEmpty) return;
 
-            if (inv.slots[slotIndex].count <= 0)
-                await DeleteItem(inventoryName, slotIndex);
+            // Trừ đúng 1 lần
+            s.count = Mathf.Max(0, s.count - amount);
+
+            if (s.count <= 0)
+            {
+                // clear local slot, KHÔNG remove lần nữa ở DeleteItem
+                inv.slots[slotIndex] = new CGP.Gameplay.InventorySystem.Inventory.Slot();
+                await DeleteItem(inventoryName, slotIndex, alreadyCleared: true);
+            }
             else
+            {
                 await SyncInventory(inventoryName, reloadAfterSync: true, allowCreateIfMissing: true);
+            }
         }
 
-        public async Task DeleteItem(string inventoryName, int slotIndex)
+        public async Task DeleteItem(string inventoryName, int slotIndex, bool alreadyCleared = false)
         {
             if (!inventoryByName.TryGetValue(inventoryName, out var inv)) return;
-            if (slotIndex < 0 || slotIndex >= inv.slots.Count || inv.slots[slotIndex].IsEmpty) return;
+            if (slotIndex < 0 || slotIndex >= inv.slots.Count) return;
 
             var key = SlotKey(inventoryName, slotIndex);
+
+            // Nếu đã clear ở UseItem thì không đụng vào local nữa
+            if (!alreadyCleared)
+            {
+                // Tuỳ implement của Inventory.Remove:
+                // nếu Remove(slotIndex) chỉ "xóa cả ô", dùng như dưới
+                // nếu Remove(slotIndex) mặc định trừ -1 thì KHÔNG gọi ở đây.
+                inv.Remove(slotIndex);
+            }
+
             if (recordIdBySlot.TryGetValue(key, out var recordId) && !string.IsNullOrEmpty(recordId))
             {
-                if (await DeleteRecordById(recordId))
-                {
-                    inv.Remove(slotIndex);
-                    recordIdBySlot.Remove(key);
-                    await SyncInventory(inventoryName, reloadAfterSync: true, allowCreateIfMissing: true);
-                }
+                await DeleteRecordById(recordId);
+                recordIdBySlot.Remove(key);
             }
-            else inv.Remove(slotIndex);
+
+            await SyncInventory(inventoryName, reloadAfterSync: true, allowCreateIfMissing: true);
         }
 
         public void TryConsume(string inventoryName, int slotIndex, int amount = 1)
@@ -751,9 +767,7 @@ namespace CGP.Gameplay.Inventory.Presenter
             s.count = Mathf.Max(0, s.count - amount);
             if (s.count == 0) inv.slots[slotIndex] = new Slot();
 
-            _ = SyncInventory(inventoryName,
-                reloadAfterSync: true,
-                allowCreateIfMissing: false);
+            _ = SyncInventory(inventoryName, reloadAfterSync: true, allowCreateIfMissing: false);
         }
 
         // ======================= LOW-LEVEL SERVER OPS =======================

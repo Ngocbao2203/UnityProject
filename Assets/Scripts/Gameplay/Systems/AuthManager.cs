@@ -68,6 +68,7 @@ namespace CGP.Gameplay.Auth
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            TryIngestTokenFromUrl();
 
 #if UNITY_EDITOR
             if (IsOfflineMode)
@@ -256,6 +257,54 @@ namespace CGP.Gameplay.Auth
                 yield return null;
             }
         }
+        private void TryIngestTokenFromUrl()
+        {
+            // WebGL + Editor (khi play scene từ URL) đều có thể có absoluteURL
+            string url = Application.absoluteURL;
+            if (string.IsNullOrEmpty(url)) return;
+
+            int q = url.IndexOf('?');
+            if (q < 0) return;
+
+            string query = url.Substring(q + 1);
+            foreach (var pair in query.Split('&'))
+            {
+                var kv = pair.Split('=');
+                if (kv.Length == 2 && kv[0].Equals("token", StringComparison.OrdinalIgnoreCase))
+                {
+                    string jwt = UnityEngine.Networking.UnityWebRequest.UnEscapeURL(kv[1]);
+                    if (!string.IsNullOrWhiteSpace(jwt))
+                    {
+                        LocalStorageHelper.SaveToken(jwt);   // lưu cache + storage
+                        PlayerPrefs.SetString(PREFS_TOKEN_KEY, jwt); // optional đồng bộ
+                        PlayerPrefs.Save();
+                        cachedJwtToken = jwt;                // dùng ngay cho request đầu
+                        Debug.Log("[Auth] Ingested token from URL param.");
+                    }
+                    break;
+                }
+            }
+        }
+
+#if UNITY_EDITOR
+// tiện test: bấm F9 để dán token từ clipboard
+private void Update()
+{
+    if (Input.GetKeyDown(KeyCode.F9))
+    {
+        var clip = GUIUtility.systemCopyBuffer;
+        if (!string.IsNullOrEmpty(clip))
+        {
+            LocalStorageHelper.SaveToken(clip.Trim());
+            PlayerPrefs.SetString(PREFS_TOKEN_KEY, clip.Trim());
+            PlayerPrefs.Save();
+            cachedJwtToken = clip.Trim();
+            Debug.Log("[Auth] Token pasted from clipboard (F9). Refreshing...");
+            RefreshUserInfo();
+        }
+    }
+}
+#endif
     }
 
     // giữ lại DTO response
