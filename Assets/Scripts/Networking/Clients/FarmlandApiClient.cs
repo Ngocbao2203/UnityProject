@@ -14,7 +14,6 @@ namespace CGP.Networking.Clients
         public int error;       // 0 = OK
         public string message;
         public int count;
-        // public object data;  // nếu BE sau này trả gì đó thì thêm
     }
 
     [Serializable]
