@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using CGP.Gameplay.Inventory.Presenter; // để lấy qty theo itemId
 
 namespace CGP.Gameplay.Shop
 {
@@ -9,6 +10,7 @@ namespace CGP.Gameplay.Shop
         [SerializeField] private Image iconImage;
         [SerializeField] private TextMeshProUGUI nameText;
         [SerializeField] private TextMeshProUGUI priceText;
+        [SerializeField] private TextMeshProUGUI ownedText;   // (tuỳ chọn) “xN” đang có
         [SerializeField] private Button sellButton;
 
         private ProductData currentItem;
@@ -16,18 +18,12 @@ namespace CGP.Gameplay.Shop
 
         private void Awake()
         {
-            // Fallback nếu quên kéo trong Inspector
-            if (iconImage == null) iconImage = GetComponentInChildren<Image>(true);
-            if (nameText == null) nameText = GetComponentInChildren<TextMeshProUGUI>(true);
-            if (priceText == null) priceText = GetComponentsInChildren<TextMeshProUGUI>(true).Length > 1
-                                                ? GetComponentsInChildren<TextMeshProUGUI>(true)[1]
-                                                : priceText;
-            if (sellButton == null) sellButton = GetComponentInChildren<Button>(true);
+            if (!sellButton) sellButton = GetComponentInChildren<Button>(true);
         }
 
         private void OnDestroy()
         {
-            if (sellButton != null) sellButton.onClick.RemoveListener(SellItem);
+            if (sellButton) sellButton.onClick.RemoveAllListeners();
         }
 
         public void Setup(ProductData item, ShopManager manager)
@@ -35,34 +31,41 @@ namespace CGP.Gameplay.Shop
             currentItem = item;
             shopManager = manager;
 
-            if (iconImage != null)
+            if (iconImage)
             {
-                iconImage.sprite = item != null ? item.icon : null;
-                iconImage.enabled = (iconImage.sprite != null);
+                iconImage.sprite = item ? item.icon : null;
+                iconImage.enabled = iconImage.sprite != null;
             }
 
-            if (nameText != null)
-                nameText.text = item != null ? item.productName : "(Unknown)";
+            if (nameText) nameText.text = item ? item.productName : "(Unknown)";
+            if (priceText) priceText.text = item ? (item.price.ToString() + "$") : "-";
 
-            if (priceText != null)
-                priceText.text = item != null ? (item.price.ToString() + "$") : "-";
+            // (tuỳ chọn) hiện số lượng đang có trong kho
+            if (ownedText && item && item.itemData)
+            {
+                var itemId = item.itemData.id;
+                int owned = InventoryManager.Instance ? InventoryManager.Instance.GetQuantityByItemId(itemId) : 0;
+                ownedText.text = owned > 0 ? $"x{owned}" : "x0";
+            }
 
-            if (sellButton != null)
+            if (sellButton)
             {
                 sellButton.onClick.RemoveAllListeners();
-                sellButton.onClick.AddListener(SellItem);
+                sellButton.onClick.AddListener(OnClickSell);
                 sellButton.interactable = (item != null && manager != null);
             }
         }
 
-        private void SellItem()
+        private void OnClickSell()
         {
-            if (shopManager == null || currentItem == null)
+            if (!shopManager || !currentItem)
             {
                 Debug.LogWarning("[Product_UI] Cannot sell: missing shopManager or currentItem");
                 return;
             }
-            shopManager.SellItem(currentItem);
+
+            // Mở popup chọn số lượng (thay vì bán 1 cái luôn)
+            shopManager.OpenSellDialog(currentItem);
         }
     }
 }

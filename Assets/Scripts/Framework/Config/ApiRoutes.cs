@@ -4,7 +4,7 @@ namespace CGP.Framework
 {
     public static class ApiRoutes
     {
-        public const string BASE_URL = "https://cgpwebapi20250901190829-a7a8haa8bmecbtdm.southeastasia-01.azurewebsites.net";
+        public const string BASE_URL = "https://cgpwebapi20250919163209-dgdwccgcfudaf5ez.indonesiacentral-01.azurewebsites.net";
 
         // ===== Auth =====
         public static class Auth
@@ -70,13 +70,10 @@ namespace CGP.Framework
         {
             public const string CREATE_QUEST = BASE_URL + "/api/Quest/CreateQuest";
 
-            // Lấy toàn bộ Quest gốc (metadata)
             public const string GET_ALL_QUESTS = BASE_URL + "/api/Quest/GetAllQuests";
 
-            // Lấy trạng thái UserQuest
             public const string GET_USER_QUESTS = BASE_URL + "/api/UserQuest/GetUserQuests?userId={userId}";
 
-            // Claim reward (truyền userQuestId)
             public const string COMPLETE_QUEST = BASE_URL + "/api/UserQuest/CompleteQuest";
         }
     }

@@ -2,10 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using UnityEngine;
+using System.Linq;
 using CGP.Networking.DTOs;
 using CGP.Networking.Clients;
-using CGP.Gameplay.Shop;
 using CGP.Gameplay.Items;
 using CGP.Gameplay.Auth;                  // AuthManager
 using CGP.Gameplay.Systems;               // CurrencyManager
@@ -16,12 +17,15 @@ namespace CGP.Gameplay.Shop
     public class ShopManager : MonoBehaviour
     {
         [Header("UI Settings")]
-        public GameObject productPrefab;   // Prefab có Product_UI
-        public Transform contentPanel;     // Nơi add các ô
-        public GameObject shopUI;          // Panel gốc
+        public GameObject productPrefab;     // Prefab có Product_UI
+        public Transform contentPanel;       // Nơi add các ô
+        public GameObject shopUI;            // Panel gốc   
+
+        [Header("Sell Dialog")]
+        [SerializeField] private SellDialogUI sellDialog;   // <-- KÉO VÀO INSPECTOR
 
         [Header("Local fallback (optional)")]
-        public List<ProductData> itemList; // Dùng khi BE chưa có danh mục
+        public List<ProductData> itemList;   // Dùng khi BE chưa có danh mục
 
         // serverItemId -> ProductData
         private readonly Dictionary<string, ProductData> _productsByItemId =
@@ -123,8 +127,7 @@ namespace CGP.Gameplay.Shop
 
             var go = Instantiate(productPrefab, contentPanel);
 
-            // KHÔNG dùng kiểu Product_UI để tránh phụ thuộc CGP.UI
-            // Tìm component tên "Product_UI" rồi gọi hàm Setup(ProductData, ShopManager) qua reflection
+            // Tìm component tên "Product_UI" rồi gọi Setup(ProductData, ShopManager)
             var comp = go.GetComponent("Product_UI") as MonoBehaviour;
             if (comp != null)
             {
@@ -133,24 +136,13 @@ namespace CGP.Gameplay.Shop
 
                 if (setup != null)
                 {
-                    try
-                    {
-                        setup.Invoke(comp, new object[] { pd, this });
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogError($"[Shop] Product_UI.Setup invoke fail: {ex}");
-                    }
+                    try { setup.Invoke(comp, new object[] { pd, this }); }
+                    catch (Exception ex) { Debug.LogError($"[Shop] Product_UI.Setup invoke fail: {ex}"); }
                 }
-                else
-                {
-                    Debug.LogError("[Shop] Product_UI không có method Setup(ProductData, ShopManager).");
-                }
+                else Debug.LogError("[Shop] Product_UI không có method Setup(ProductData, ShopManager).");
             }
             else
             {
-                // Fallback: nếu không tìm thấy Product_UI thì thử dùng SendMessage 1 tham số
-                // (nếu bạn có overload Setup(ProductData) bên UI)
                 go.SendMessage("Setup", pd, SendMessageOptions.DontRequireReceiver);
                 Debug.LogWarning("[Shop] productPrefab không gắn Product_UI hoặc tên khác.");
             }
@@ -168,7 +160,7 @@ namespace CGP.Gameplay.Shop
                     if (it?.itemData == null) continue;
                     if (string.Equals(GetItemId(it.itemData), dto.itemId, StringComparison.OrdinalIgnoreCase))
                     {
-                        it.price = dto.sellPrice;                           // lấy giá server
+                        it.price = dto.sellPrice;
                         if (!string.IsNullOrEmpty(dto.itemName))
                             it.productName = dto.itemName;
                         return it;
@@ -176,12 +168,11 @@ namespace CGP.Gameplay.Shop
                 }
             }
 
-            // 2) tạo runtime ProductData nếu không có sẵn
+            // 2) runtime ProductData
             var pd = ScriptableObject.CreateInstance<ProductData>();
             pd.productName = string.IsNullOrEmpty(dto.itemName) ? "Item" : dto.itemName;
             pd.price = dto.sellPrice;
 
-            // map icon từ ItemData nếu có
             var im = GameManager.instance ? GameManager.instance.itemManager : FindFirstObjectByType<ItemManager>();
             ItemData data = null;
             if (im != null)
@@ -196,105 +187,160 @@ namespace CGP.Gameplay.Shop
             return pd;
         }
 
-        // ================= SELL =================
-        public void SellItem(ProductData product)
+        // ================= SELL (mở dialog) =================
+        public void OpenSellDialog(ProductData product)
         {
-            if (product == null)
+            if (product == null || product.itemData == null || sellDialog == null)
             {
-                Debug.LogWarning("[Shop] Product null.");
+                // fallback: bán 1 nếu thiếu dialog
+                SellItem(product);
                 return;
             }
 
-            var auth = AuthManager.Instance;
-            string userId = auth != null ? auth.GetCurrentUserId() : null;
-            if (string.IsNullOrEmpty(userId))
-            {
-                Debug.LogWarning("[Shop] Chưa có userId (AuthManager).");
-                return;
-            }
+            // ===== Chuẩn bị =====
+            string targetId = NormalizeId(ExtractIdFromItemData(product.itemData));
+            int unitPrice = Mathf.Max(0, product.price);
 
+            // Tìm slot thực tế trong Backpack/Toolbar để lấy đúng số lượng
+            CGP.Gameplay.InventorySystem.Inventory.Slot foundSlot = null;
             var invMgr = InventoryManager.Instance;
-            var backpack = invMgr?.GetInventoryByName(InventoryManager.BACKPACK);
-            if (backpack == null)
+
+            if (invMgr != null)
             {
-                Debug.LogError("[Shop] Backpack not found.");
-                return;
-            }
-
-            // Lấy GUID từ ItemData của product
-            string targetId = ExtractIdFromItemData(product.itemData);
-            if (string.IsNullOrEmpty(targetId))
-            {
-                Debug.LogWarning("[Shop] ProductData.itemData không có id hợp lệ.");
-                return;
-            }
-            targetId = NormalizeId(targetId);
-
-            // Tìm 1 slot khớp ID (ưu tiên), nếu không có thì khớp theo tên
-            int slotIndex = -1;
-            for (int i = 0; i < backpack.slots.Count; i++)
-            {
-                var s = backpack.slots[i];
-                if (s == null || s.count <= 0 || s.itemData == null) continue;
-
-                string slotId = NormalizeId(ExtractIdFromAny(s.itemData));
-                string slotName = Safe(GetNameFromAny(s.itemData));
-                string prodName = Safe(product.productName);
-
-                bool idMatch = !string.IsNullOrEmpty(slotId) && slotId == targetId;
-                bool nameMatch = !string.IsNullOrEmpty(slotName) && !string.IsNullOrEmpty(prodName) &&
-                                 string.Equals(slotName, prodName, StringComparison.OrdinalIgnoreCase);
-
-                if (idMatch || nameMatch)
+                foreach (var invName in new[] { InventoryManager.BACKPACK, InventoryManager.TOOLBAR })
                 {
-                    slotIndex = i;
-                    break;
+                    var inv = invMgr.GetInventoryByName(invName);
+                    if (inv == null || inv.slots == null) continue;
+
+                    for (int i = 0; i < inv.slots.Count; i++)
+                    {
+                        var s = inv.slots[i];
+                        if (s == null || s.IsEmpty || s.itemData == null) continue;
+
+                        string sid = NormalizeId(ExtractIdFromAny(s.itemData));
+                        if (!string.IsNullOrEmpty(sid) && sid == targetId)
+                        {
+                            foundSlot = s;
+                            break;
+                        }
+                    }
+                    if (foundSlot != null) break;
                 }
             }
 
-            if (slotIndex < 0)
+            // ===== Nếu tìm được slot: gọi overload nhận Slot (an toàn nhất) =====
+            if (foundSlot != null && !foundSlot.IsEmpty)
             {
-                Debug.LogWarning($"❌ Không có {product.productName} trong Backpack để bán! (id={targetId})");
+                sellDialog.Show(foundSlot, unitPrice, qty => SellQuantityAsync(product, qty));
                 return;
             }
 
-            int quantity = 1;
+            // ===== Fallback: truyền sprite + owned tổng =====
+            var spr = product.icon ? product.icon : product.itemData.icon;
+
+            int owned = 0;
+            if (invMgr != null && !string.IsNullOrEmpty(targetId))
+            {
+                // cộng dồn quantity từ snapshot server đang cache
+                owned = invMgr.inventoryItems != null
+                    ? invMgr.inventoryItems.FindAll(it => NormalizeId(it.itemId) == targetId)
+                                           .Sum(it => it.quantity)
+                    : 0;
+            }
+
+            sellDialog.Show(spr, owned, unitPrice, qty => SellQuantityAsync(product, qty));
+        }
+
+        /// <summary>
+        /// Giữ lại hàm cũ: bán 1 món (fallback khi thiếu dialog).
+        /// </summary>
+        public void SellItem(ProductData product)
+        {
+            if (product == null) return;
+            _ = SellQuantityAsync(product, 1);
+        }
+
+        /// <summary>
+        /// Bán N món: gọi API, trừ kho local (gộp nhiều stack), cộng tiền, sync lại.
+        /// </summary>
+        private Task<bool> SellQuantityAsync(ProductData product, int quantity)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            if (product == null || quantity <= 0)
+            {
+                tcs.SetResult(false);
+                return tcs.Task;
+            }
+
+            var auth = AuthManager.Instance;
+            string userId = auth?.GetCurrentUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                Debug.LogWarning("[Shop] Chưa có userId (AuthManager).");
+                tcs.SetResult(false);
+                return tcs.Task;
+            }
+
+            string targetId = NormalizeId(ExtractIdFromItemData(product.itemData));
+            if (string.IsNullOrEmpty(targetId))
+            {
+                Debug.LogWarning("[Shop] ProductData.itemData không có id hợp lệ.");
+                tcs.SetResult(false);
+                return tcs.Task;
+            }
+
             StartCoroutine(ShopApiClient.SellItem(
                 userId, targetId, quantity,
                 onOk: env =>
                 {
-                    if (env != null && env.error == 0)
+                    bool ok = env != null && env.error == 0;
+                    if (!ok) { tcs.TrySetResult(false); return; }
+
+                    // --- Trừ local từ Backpack (có thể nhiều stack) ---
+                    var invMgr = InventoryManager.Instance;
+                    var backpack = invMgr?.GetInventoryByName(InventoryManager.BACKPACK);
+
+                    int need = quantity;
+                    if (backpack != null)
                     {
-                        // ✅ Trừ local ngay
-                        var s = backpack.slots[slotIndex];
-                        if (s != null)
+                        for (int i = 0; i < backpack.slots.Count && need > 0; i++)
                         {
-                            s.count -= quantity;
-                            if (s.count <= 0) backpack.Remove(slotIndex);
+                            var s = backpack.slots[i];
+                            if (s == null || s.count <= 0 || s.itemData == null) continue;
+
+                            string sid = NormalizeId(ExtractIdFromAny(s.itemData));
+                            if (sid != targetId) continue;
+
+                            int take = Mathf.Min(need, s.count);
+                            s.count -= take;
+                            need -= take;
+                            if (s.count <= 0) backpack.Remove(i);
                         }
 
-                        // ✅ Cộng tiền local
-                        CurrencyManager.Instance?.AddCoins(product.price * quantity);
-                        Debug.Log($"✅ Đã bán {product.productName}, +{product.price * quantity}$");
+                        // đồng bộ từ server cho sạch record
+                        _ = invMgr.SyncInventory(
+                            InventoryManager.BACKPACK,
+                            reloadAfterSync: true,
+                            allowCreateIfMissing: false,
+                            ignoreDebounce: true
+                        );
+                    }
 
-                        // 🔄 Hard refresh từ server để dọn record quantity=0 và đồng bộ UI
-                        if (invMgr != null)
-                        {
-                            _ = invMgr.SyncInventory(
-                                InventoryManager.BACKPACK,
-                                reloadAfterSync: true,
-                                allowCreateIfMissing: false,
-                                ignoreDebounce: true
-                            );
-                        }
-                    }
-                    else
-                    {
-                        Debug.LogError("[Shop] SELL FAIL: " + (env?.message ?? "null response"));
-                    }
+                    // --- Cộng tiền ---
+                    int gained = Mathf.Max(0, product.price) * quantity;
+                    CurrencyManager.Instance?.AddCoins(gained);
+
+                    Debug.Log($"✅ Đã bán {product.productName} x{quantity}, +{gained}$");
+                    tcs.TrySetResult(true);
                 },
-                onErr: err => Debug.LogError("[Shop] SELL HTTP ERROR: " + err)
+                onErr: err =>
+                {
+                    Debug.LogError("[Shop] SELL HTTP ERROR: " + err);
+                    tcs.TrySetResult(false);
+                }
             ));
+
+            return tcs.Task;
         }
 
         // ================= Helpers =================
@@ -308,7 +354,6 @@ namespace CGP.Gameplay.Shop
             return s.Trim().Trim('{', '}').ToLowerInvariant(); // GUID compare
         }
 
-        // lấy id từ ItemData
         private static string ExtractIdFromItemData(object itemDataObj)
         {
             if (itemDataObj == null) return null;
@@ -334,7 +379,6 @@ namespace CGP.Gameplay.Shop
             return null;
         }
 
-        // lấy id từ Item runtime hoặc ItemData
         private static string ExtractIdFromAny(object obj)
         {
             if (obj == null) return null;
