@@ -63,6 +63,9 @@ namespace CGP.Gameplay.Inventory.Presenter
         // Sự kiện cho UI
         public event Action OnInventoryLoaded;
 
+        private static readonly System.Threading.SemaphoreSlim _starterPackLock = new(1, 1);
+        private bool _starterPackInProgress = false;
+
         // ===================== Vòng đời =====================
         private void Awake()
         {
@@ -191,39 +194,59 @@ namespace CGP.Gameplay.Inventory.Presenter
             }
         }
 
+        // === Thay thế toàn bộ hàm ApplyServerToLocal hiện có bằng bản dưới đây ===
         private void ApplyServerToLocal()
         {
             if (_isDragging) return;
 
-            // clear local
+            // 0) Clear local
             for (int i = 0; i < backpack.slots.Count; i++) backpack.slots[i] = new Slot();
             for (int i = 0; i < toolbar.slots.Count; i++) toolbar.slots[i] = new Slot();
             _recordIdBySlot.Clear();
 
             if (inventoryItems == null || inventoryItems.Count == 0) return;
 
+            // 1) MERGE: gộp các record trùng (Inv, Slot, ItemId)
+            var merged = inventoryItems
+                .Where(r => r != null && r.quantity > 0)
+                .GroupBy(r => new
+                {
+                    Inv = string.Equals(r.inventoryType, TOOLBAR, System.StringComparison.OrdinalIgnoreCase) ? TOOLBAR : BACKPACK,
+                    Slot = r.slotIndex,
+                    Item = r.itemId ?? string.Empty
+                })
+                .Select(g =>
+                {
+                    // chọn 1 record đại diện (id/itemType) — có thể chọn newest nếu bạn có timestamp
+                    var repr = g.First();
+                    return new
+                    {
+                        Inv = g.Key.Inv,
+                        Slot = g.Key.Slot,
+                        ItemId = string.IsNullOrEmpty(g.Key.Item) ? repr.itemId : g.Key.Item,
+                        ItemType = repr.itemType,
+                        RecordId = repr.id,
+                        Qty = g.Sum(x => Mathf.Max(0, x.quantity))
+                    };
+                })
+                .ToList();
+
+            // 2) Map sang ItemData để có icon + tên hiển thị
             var im = GameManager.instance ? GameManager.instance.itemManager
-                                          : FindFirstObjectByType<ItemManager>();
+                              : UnityEngine.Object.FindFirstObjectByType<ItemManager>();
 
-            foreach (var rec in inventoryItems)
+            foreach (var m in merged)
             {
-                if (rec == null || rec.quantity <= 0) continue;
+                var inv = GetInventoryByName(m.Inv) ?? backpack;
+                if (m.Slot < 0 || m.Slot >= inv.slots.Count) continue;
 
-                var invName = string.Equals(rec.inventoryType, TOOLBAR, StringComparison.OrdinalIgnoreCase) ? TOOLBAR : BACKPACK;
-                var inv = GetInventoryByName(invName) ?? backpack;
-
-                if (rec.slotIndex < 0 || rec.slotIndex >= inv.slots.Count) continue;
-
-                var slot = new Slot { count = rec.quantity };
+                var slot = new Slot { count = m.Qty };
 
                 ItemData data = null;
-                if (im != null)
-                {
-                    if (!string.IsNullOrEmpty(rec.itemId))
-                        data = im.GetItemDataByServerId(rec.itemId);
-                    if (data == null && !string.IsNullOrEmpty(rec.itemType))
-                        data = im.GetItemDataByName(rec.itemType);
-                }
+                if (!string.IsNullOrEmpty(m.ItemId))
+                    data = im?.GetItemDataByServerId(m.ItemId);
+                if (data == null && !string.IsNullOrEmpty(m.ItemType))
+                    data = im?.GetItemDataByName(m.ItemType);
 
                 if (data != null)
                 {
@@ -233,80 +256,142 @@ namespace CGP.Gameplay.Inventory.Presenter
                 }
                 else
                 {
-                    slot.itemName = !string.IsNullOrEmpty(rec.itemType) ? rec.itemType : (rec.itemId ?? "(Unknown)");
+                    slot.itemName = !string.IsNullOrEmpty(m.ItemType) ? m.ItemType : (m.ItemId ?? "(Unknown)");
                 }
 
-                inv.slots[rec.slotIndex] = slot;
+                inv.slots[m.Slot] = slot;
 
-                if (!string.IsNullOrEmpty(rec.id))
-                    _recordIdBySlot[SlotKey(invName, rec.slotIndex)] = rec.id;
+                // lưu record id để Delete/Update về sau
+                if (!string.IsNullOrEmpty(m.RecordId))
+                    _recordIdBySlot[SlotKey(m.Inv, m.Slot)] = m.RecordId;
             }
+
+            OnInventoryLoaded?.Invoke();
         }
 
         // ===================== Starter Pack =====================
         public async System.Threading.Tasks.Task EnsureStarterPackOnFirstLogin(StarterPackConfig cfg, bool reloadAfter = true)
         {
-            if (!EnsureAuthReady(out var userId)) return;
-
-            // Dùng key theo từng user để đảm bảo mỗi tài khoản chỉ nhận 1 lần
-            string playerPrefKey = $"cgp_starter_pack_given:{userId}";
-
-            // Snapshot server hiện tại
-            var server = await FetchInventoryData(userId) ?? new List<InventoryItem>();
-
-            // Nếu có marker trên server thì coi như đã tặng
-            bool hasMarkerOnServer = !string.IsNullOrEmpty(cfg?.markerItemId) &&
-                                     server.Any(it =>
-                                         string.Equals(it.itemId, cfg.markerItemId, StringComparison.OrdinalIgnoreCase) &&
-                                         string.Equals(it.inventoryType ?? "", (cfg.markerInventoryType ?? "System"), StringComparison.OrdinalIgnoreCase) &&
-                                         it.quantity > 0);
-
-            bool given = PlayerPrefs.GetInt(playerPrefKey, 0) == 1;
-
-            if (!hasMarkerOnServer && !given)
+            // khóa chống gọi chồng
+            if (_starterPackInProgress) return;
+            _starterPackInProgress = true;
+            await _starterPackLock.WaitAsync();
+            try
             {
-                // 1) Cấp từng quà trong cfg.items
-                if (cfg?.items != null)
+                if (!EnsureAuthReady(out var userId) || cfg == null) return;
+
+                string playerPrefKey = $"cgp_starter_pack_given:{userId}";
+
+                // Nếu client đã đánh dấu → bỏ qua
+                if (PlayerPrefs.GetInt(playerPrefKey, 0) == 1)
+                {
+                    if (reloadAfter) await LoadInventory(userId, applyToLocal: true);
+                    return;
+                }
+
+                // Lấy snapshot server ban đầu
+                var server = await FetchInventoryData(userId) ?? new List<InventoryItem>();
+
+                // Kiểm tra marker trên server
+                bool hasMarkerOnServer = !string.IsNullOrEmpty(cfg.markerItemId) &&
+                                         server.Any(it =>
+                                            string.Equals(it.itemId, cfg.markerItemId, StringComparison.OrdinalIgnoreCase) &&
+                                            string.Equals(it.inventoryType ?? "", (cfg.markerInventoryType ?? "System"), StringComparison.OrdinalIgnoreCase) &&
+                                            it.quantity > 0);
+
+                if (hasMarkerOnServer)
+                {
+                    // server đã cho → đánh dấu client và thoát
+                    PlayerPrefs.SetInt(playerPrefKey, 1);
+                    PlayerPrefs.Save();
+                    if (reloadAfter) await LoadInventory(userId, applyToLocal: true);
+                    return;
+                }
+
+                // ❗ ĐÁNH DẤU SỚM trên client để chặn lần gọi thứ hai trong cùng phiên
+                PlayerPrefs.SetInt(playerPrefKey, 1);
+                PlayerPrefs.Save();
+
+                // 1) TẠO MARKER TRƯỚC
+                if (!string.IsNullOrEmpty(cfg.markerItemId))
+                {
+                    string invMarker = string.IsNullOrEmpty(cfg.markerInventoryType) ? "System" : cfg.markerInventoryType;
+                    int capMarker = string.Equals(invMarker, TOOLBAR, StringComparison.OrdinalIgnoreCase) ? toolbarSlotsCount : backpackSlotsCount;
+
+                    // tìm slot trống cho marker
+                    int markerSlot = -1;
+                    for (int i = 0; i < capMarker; i++)
+                        if (!server.Any(it => string.Equals(it.inventoryType, invMarker, StringComparison.OrdinalIgnoreCase) && it.slotIndex == i))
+                        { markerSlot = i; break; }
+
+                    if (markerSlot >= 0)
+                    {
+                        var markerId = await PostCreate(userId, cfg.markerItemId, 1, invMarker, markerSlot);
+                        if (!string.IsNullOrEmpty(markerId))
+                        {
+                            server.Add(new InventoryItem
+                            {
+                                id = markerId,
+                                userId = userId,
+                                itemId = cfg.markerItemId,
+                                inventoryType = invMarker,
+                                slotIndex = markerSlot,
+                                quantity = 1
+                            });
+                        }
+                        else
+                        {
+                            // nếu tạo marker thất bại, vẫn tiếp tục nhưng vẫn có nguy cơ double nếu gọi lại
+                            Debug.LogWarning("[StarterPack] Failed to create marker.");
+                        }
+                    }
+                }
+
+                // 2) CẤP QUÀ — đảm bảo tối thiểu, KHÔNG cộng dồn
+                if (cfg.items != null)
                 {
                     foreach (var g in cfg.items)
                     {
                         if (g == null || g.item == null || string.IsNullOrEmpty(g.item.id)) continue;
-                        int qty = Mathf.Max(1, g.quantity);
+
+                        int desiredQty = Mathf.Max(1, g.quantity);
                         string invName = string.IsNullOrEmpty(g.inventoryType) ? BACKPACK : g.inventoryType;
-
                         int capacity = string.Equals(invName, TOOLBAR, StringComparison.OrdinalIgnoreCase) ? toolbarSlotsCount : backpackSlotsCount;
-                        bool SlotOccupied(int idx) => server.Any(it =>
-                            string.Equals(it.inventoryType, invName, StringComparison.OrdinalIgnoreCase) &&
-                            it.slotIndex == idx);
 
-                        // Thử stack nếu đã có cùng item trong cùng inventory
+                        // tìm record cùng item (bất kể slot) trong inventory đích
                         var exist = server.FirstOrDefault(it =>
                             string.Equals(it.inventoryType, invName, StringComparison.OrdinalIgnoreCase) &&
                             string.Equals(it.itemId, g.item.id, StringComparison.OrdinalIgnoreCase));
 
                         if (exist != null)
                         {
-                            // Tăng số lượng record đang có
-                            var dto = new UpdateDto
+                            // chỉ nâng lên tối thiểu desiredQty
+                            int newQty = Mathf.Max(exist.quantity, desiredQty);
+                            if (newQty != exist.quantity)
                             {
-                                Id = exist.id,
-                                UserId = exist.userId,
-                                ItemId = exist.itemId,
-                                Quantity = Mathf.Max(0, exist.quantity + qty),
-                                InventoryType = invName,
-                                SlotIndex = exist.slotIndex
-                            };
-                            var put = await PutUpdate(dto);
-                            if (put.ok)
-                            {
-                                exist.quantity = dto.Quantity;
-                                continue;
+                                var dto = new UpdateDto
+                                {
+                                    Id = exist.id,
+                                    UserId = exist.userId,
+                                    ItemId = exist.itemId,
+                                    Quantity = newQty,
+                                    InventoryType = invName,
+                                    SlotIndex = exist.slotIndex
+                                };
+                                var put = await PutUpdate(dto);
+                                if (put.ok) exist.quantity = newQty;
                             }
+                            continue;
                         }
 
-                        // Không stack được → chọn slot trống
+                        // chưa có → đặt vào slot mong muốn/trống
+                        bool SlotOccupied(int idx) => server.Any(it =>
+                            string.Equals(it.inventoryType, invName, StringComparison.OrdinalIgnoreCase) &&
+                            it.slotIndex == idx);
+
                         int slot = (g.preferredSlot >= 0 && g.preferredSlot < capacity && !SlotOccupied(g.preferredSlot))
                                    ? g.preferredSlot : -1;
+
                         if (slot < 0)
                         {
                             for (int i = 0; i < capacity; i++)
@@ -315,11 +400,11 @@ namespace CGP.Gameplay.Inventory.Presenter
 
                         if (slot < 0)
                         {
-                            Debug.LogWarning($"[StarterPack] Hết chỗ trong {invName} để cấp '{g.item.itemName}'. Bỏ qua.");
+                            Debug.LogWarning($"[StarterPack] No free slot in {invName} for '{g.item.itemName}'.");
                             continue;
                         }
 
-                        var newId = await PostCreate(userId, g.item.id, qty, invName, slot);
+                        var newId = await PostCreate(userId, g.item.id, desiredQty, invName, slot);
                         if (!string.IsNullOrEmpty(newId))
                         {
                             server.Add(new InventoryItem
@@ -330,51 +415,21 @@ namespace CGP.Gameplay.Inventory.Presenter
                                 itemType = g.item.itemName,
                                 inventoryType = invName,
                                 slotIndex = slot,
-                                quantity = qty
+                                quantity = desiredQty
                             });
                         }
                     }
                 }
 
-                // 2) Ghi marker để lần sau không tặng nữa (ưu tiên System inventory)
-                if (!string.IsNullOrEmpty(cfg?.markerItemId))
+                if (reloadAfter)
                 {
-                    string invName = string.IsNullOrEmpty(cfg.markerInventoryType) ? "System" : cfg.markerInventoryType;
-                    int capacity = string.Equals(invName, TOOLBAR, StringComparison.OrdinalIgnoreCase) ? toolbarSlotsCount : backpackSlotsCount;
-                    bool SlotOccupied2(int idx) => server.Any(it =>
-                        string.Equals(it.inventoryType, invName, StringComparison.OrdinalIgnoreCase) &&
-                        it.slotIndex == idx);
-
-                    int markerSlot = -1;
-                    for (int i = 0; i < capacity; i++)
-                        if (!SlotOccupied2(i)) { markerSlot = i; break; }
-
-                    if (markerSlot >= 0)
-                    {
-                        var markerId = await PostCreate(userId, cfg.markerItemId, 1, invName, markerSlot);
-                        if (!string.IsNullOrEmpty(markerId))
-                        {
-                            server.Add(new InventoryItem
-                            {
-                                id = markerId,
-                                userId = userId,
-                                itemId = cfg.markerItemId,
-                                inventoryType = invName,
-                                slotIndex = markerSlot,
-                                quantity = 1
-                            });
-                        }
-                    }
+                    await LoadInventory(userId, applyToLocal: true);
                 }
-
-                // 3) Đánh dấu PlayerPrefs để không tặng lại (phòng khi offline)
-                PlayerPrefs.SetInt(playerPrefKey, 1);
-                PlayerPrefs.Save();
             }
-
-            if (reloadAfter)
+            finally
             {
-                await LoadInventory(userId, applyToLocal: true);
+                _starterPackLock.Release();
+                _starterPackInProgress = false;
             }
         }
 
@@ -459,6 +514,12 @@ namespace CGP.Gameplay.Inventory.Presenter
             {
                 _consumingKeys.Remove(key);
             }
+        }
+
+        public async System.Threading.Tasks.Task ReloadFromServer()
+        {
+            if (!EnsureAuthReady(out var userId)) return;
+            await LoadInventory(userId, applyToLocal: true); // sẽ gọi ApplyServerToLocal + OnInventoryLoaded
         }
 
         public async System.Threading.Tasks.Task DeleteItem(string inventoryName, int slotIndex, bool alreadyCleared = false)

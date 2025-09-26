@@ -41,29 +41,52 @@ namespace CGP.UI
             _parentUI = GetComponentInParent<Inventory_UI>();
         }
 
+        void OnDisable()
+        {
+            // Tooltip: ẩn khi đối tượng bị disable
+            if (UI_Manager.Instance?.Tooltip != null)
+                UI_Manager.Instance.Tooltip.Hide();
+        }
+
         void Update()
         {
             var target = _hovering ? _baseScale * hoverScale : _baseScale;
             _rt.localScale = Vector3.Lerp(_rt.localScale, target, Time.unscaledDeltaTime * scaleSpeed);
         }
 
+        // ===== helpers =====
+        bool TryGetSlot(out Inventory.Slot s)
+        {
+            s = null;
+            if (inventory == null || slotID < 0 || slotID >= (inventory?.slots?.Count ?? 0))
+                return false;
+
+            s = inventory.slots[slotID];
+            return s != null && s.count > 0;
+        }
+
+        ItemData ResolveItemData(Inventory.Slot s)
+        {
+            // đã có thì dùng luôn
+            if (s.itemData != null) return s.itemData;
+
+            // fallback: tra theo tên trong ItemManager
+            if (GameManager.instance?.itemManager != null && !string.IsNullOrEmpty(s.itemName))
+                return GameManager.instance.itemManager.GetItemDataByName(s.itemName);
+
+            return null;
+        }
+
         // ===== Data → UI =====
         public void UpdateSlotUI()
         {
-            if (inventory == null || slotID < 0 || slotID >= inventory.slots.Count)
+            if (!TryGetSlot(out var s))
             {
                 SetEmpty();
                 return;
             }
 
-            var s = inventory.slots[slotID];
-            if (s == null || s.count <= 0)
-            {
-                SetEmpty();
-                return;
-            }
-
-            // Fallback resolve: chỉ tra bằng tên item (KHÔNG dùng tên để tra server id)
+            // Fallback resolve icon/data
             if ((s.itemData == null || s.icon == null) && GameManager.instance != null)
             {
                 var im = GameManager.instance.itemManager;
@@ -147,11 +170,34 @@ namespace CGP.UI
         }
 
         // ===== Pointer events =====
-        public void OnPointerEnter(PointerEventData e) { _hovering = true; if (highlight) highlight.SetActive(true); }
-        public void OnPointerExit(PointerEventData e) { _hovering = false; if (highlight) highlight.SetActive(false); }
+        public void OnPointerEnter(PointerEventData e)
+        {
+            _hovering = true;
+            if (highlight) highlight.SetActive(true);
+
+            // Tooltip: chỉ show khi có item
+            if (TryGetSlot(out var s))
+            {
+                var data = ResolveItemData(s);
+                if (data != null)
+                    UI_Manager.Instance?.Tooltip?.Show(data);
+            }
+        }
+
+        public void OnPointerExit(PointerEventData e)
+        {
+            _hovering = false;
+            if (highlight) highlight.SetActive(false);
+
+            // Tooltip
+            UI_Manager.Instance?.Tooltip?.Hide();
+        }
 
         public void OnPointerDown(PointerEventData e)
         {
+            // ẩn tooltip khi bắt đầu drag/click
+            UI_Manager.Instance?.Tooltip?.Hide();
+
             // chỉ bắt drag khi có item
             var data = inventory != null && slotID >= 0 && slotID < (inventory?.slots?.Count ?? 0)
                 ? inventory.slots[slotID] : null;

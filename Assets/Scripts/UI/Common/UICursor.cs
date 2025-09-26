@@ -126,7 +126,14 @@ namespace CGP.UI
         {
             cursorImage.sprite = sprite;
             _rt.localScale = Vector3.one * scale;
-            // Giữ nguyên pivot hiện tại của RectTransform để làm hotspot
+
+            // NEW: sync pivot UI với pivot của sprite (nếu có)
+            if (sprite != null)
+            {
+                var r = sprite.rect.size;
+                var p01 = new Vector2(sprite.pivot.x / r.x, sprite.pivot.y / r.y);
+                _rt.pivot = p01;
+            }
         }
 
         private void ApplyStyle(CursorStyle style)
@@ -134,9 +141,16 @@ namespace CGP.UI
             cursorImage.sprite = style.sprite;
             _rt.localScale = Vector3.one * (style.scale <= 0 ? 1f : style.scale);
 
-            // nếu có pivot custom → set pivot làm hotspot
             if (style.pivot01.x >= 0f && style.pivot01.y >= 0f)
-                _rt.pivot = style.pivot01;
+            {
+                _rt.pivot = style.pivot01; // dùng pivot custom
+            }
+            else if (style.sprite != null)
+            {
+                // dùng pivot của sprite
+                var r = style.sprite.rect.size;
+                _rt.pivot = new Vector2(style.sprite.pivot.x / r.x, style.sprite.pivot.y / r.y);
+            }
         }
 
         public void Show(bool show)

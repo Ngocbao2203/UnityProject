@@ -11,8 +11,11 @@ namespace CGP.UI.Quests
         [Header("Refs")]
         public Image leftIcon;
         public TMP_Text qtyText;
-        public TMP_Text descriptionText;
-        public TMP_Text progressText;
+
+        // Đổi tên biến
+        public TMP_Text nameText;          // hiển thị questName
+        public TMP_Text descriptionText;   // hiển thị quest description
+
         public Button actionButton;
         public TMP_Text actionText;
         public Sprite placeholderIcon;
@@ -33,8 +36,9 @@ namespace CGP.UI.Quests
                 return;
             }
 
-            if (descriptionText) descriptionText.text = _vm.meta.questName;
-            if (progressText) progressText.text = _vm.progressText;
+            if (nameText) nameText.text = _vm.meta.questName;
+            if (descriptionText) descriptionText.text = _vm.meta.description;
+
             if (qtyText)
             {
                 var showQty = _vm.meta.amountReward > 1;
@@ -65,8 +69,8 @@ namespace CGP.UI.Quests
                 return;
             }
 
-            if (descriptionText) descriptionText.text = _vm.meta.questName;
-            if (progressText) progressText.text = _vm.progressText;
+            if (nameText) nameText.text = _vm.meta.questName;
+            if (descriptionText) descriptionText.text = _vm.meta.description;
 
             if (qtyText)
             {
@@ -90,7 +94,6 @@ namespace CGP.UI.Quests
         {
             Sprite s = null;
 
-            // Ưu tiên icon từ ItemManager theo serverItemId
             var im = GameManager.instance ? GameManager.instance.itemManager : null;
             if (im != null && !string.IsNullOrEmpty(serverItemId))
             {
@@ -98,7 +101,6 @@ namespace CGP.UI.Quests
                 if (d != null && d.icon != null) s = d.icon;
             }
 
-            // Fallback placeholder
             if (s == null) s = placeholderIcon;
 
             if (leftIcon)
@@ -120,8 +122,8 @@ namespace CGP.UI.Quests
 
         void ApplyEmpty()
         {
+            if (nameText) nameText.text = string.Empty;
             if (descriptionText) descriptionText.text = string.Empty;
-            if (progressText) progressText.text = string.Empty;
             if (qtyText) qtyText.text = string.Empty;
             if (leftIcon)
             {

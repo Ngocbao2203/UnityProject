@@ -99,14 +99,17 @@ namespace CGP.Gameplay.Quests
 
             if (ok)
             {
-                vm.MarkClaimedLocal(); // khóa nút ngay
-                                       // (tuỳ chọn) sync lại túi đồ
+                // Khóa nút/ngăn spam ngay lập tức
+                vm.MarkClaimedLocal();
+
+                // Kéo snapshot mới nhất từ server về local để thấy phần thưởng ngay
                 var inv = CGP.Gameplay.Inventory.Presenter.InventoryManager.Instance;
-                inv?.DebugDumpServerInventory();
-                _ = inv?.SyncInventory(
-                    CGP.Gameplay.Inventory.Presenter.InventoryManager.BACKPACK,
-                    reloadAfterSync: true, allowCreateIfMissing: true);
+                if (inv != null)
+                {
+                    await inv.ReloadFromServer();   // <-- thêm hàm này trong InventoryManager như mình đã gửi
+                }
             }
+
             return ok;
         }
     }

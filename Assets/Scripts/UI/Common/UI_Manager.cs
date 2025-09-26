@@ -5,15 +5,20 @@ namespace CGP.UI
 {
     public class UI_Manager : MonoBehaviour
     {
-        // ===== Inventory UI map =====
+        public static UI_Manager Instance { get; private set; }   // 🆕 Singleton
+
+        [Header("Inventory UIs")]
         [SerializeField] private List<Inventory_UI> inventoryUIs = new();
         private readonly Dictionary<string, Inventory_UI> inventoryUIByName = new();
 
-        // ===== Panels =====
+        [Header("Panels")]
         [SerializeField] private GameObject inventoryPanel;
         [SerializeField] private GameObject questPanel;
         [SerializeField] private GameObject shopPanel;
         [SerializeField] private GameObject tutorialPanel;
+
+        [Header("Tooltip")]
+        public ItemTooltip Tooltip;   // 🆕 kéo prefab/obj ItemTooltip vào đây trong Inspector
 
         // ===== Drag state =====
         public static Slot_UI draggedSlot;
@@ -22,22 +27,26 @@ namespace CGP.UI
 
         private void Awake()
         {
+            // Singleton
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+            Instance = this;
+
             BuildInventoryMap();
         }
 
         private void Start()
         {
-            // Ẩn tất cả khi bắt đầu
             CloseAllPanels();
         }
 
         private void Update()
         {
-            // Phím tắt vẫn dùng được
             if (Input.GetKeyDown(KeyCode.B) || Input.GetKeyDown(KeyCode.Tab))
-            {
                 ToggleInventoryUI();
-            }
 
             if (Input.GetKeyDown(KeyCode.C)) ToggleShopPanel();
             if (Input.GetKeyDown(KeyCode.I)) ToggleTutorialPanel();
@@ -52,21 +61,10 @@ namespace CGP.UI
             TogglePanel(inventoryPanel, () => RefreshInventoryUI("Backpack"));
         }
 
-        public void ToggleQuestPanel()
-        {
-            TogglePanel(questPanel);
-        }
-
-        public void ToggleShopPanel()
-        {
-            TogglePanel(shopPanel);
-        }
-
-        public void ToggleTutorialPanel()
-        {
-            TogglePanel(tutorialPanel);
-        }
-
+        public void ToggleQuestPanel() => TogglePanel(questPanel);
+        public void ToggleShopPanel() => TogglePanel(shopPanel);
+        public void ToggleTutorialPanel() => TogglePanel(tutorialPanel);
+        
         private void TogglePanel(GameObject panel, System.Action afterOpen = null)
         {
             if (!panel) return;
@@ -88,6 +86,9 @@ namespace CGP.UI
             if (questPanel) questPanel.SetActive(false);
             if (shopPanel) shopPanel.SetActive(false);
             if (tutorialPanel) tutorialPanel.SetActive(false);
+
+            // 🆕 đóng tooltip khi tắt panel
+            Tooltip?.Hide();
         }
 
         // ---------- Inventory helpers ----------
@@ -118,10 +119,10 @@ namespace CGP.UI
                     inventoryUIByName.Add(ui.inventoryName, ui);
             }
         }
+
         public void DebugBackpackClick()
         {
             Debug.Log(">>> Backpack Button Clicked <<<");
         }
-
     }
 }

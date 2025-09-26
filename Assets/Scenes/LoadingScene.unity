@@ -265,8 +265,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -0.0039825, y: 0.010551}
-  m_SizeDelta: {x: 2295, y: 903.54}
+  m_AnchoredPosition: {x: 0, y: 0.0024948}
+  m_SizeDelta: {x: 1920, y: 1080}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &633247551
 MonoBehaviour:
@@ -301,7 +301,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Texture: {fileID: 2800000, guid: c27b0271082152d40885bf6ba18fe083, type: 3}
+  m_Texture: {fileID: 2800000, guid: e58a8b628d3ce6e4b967cdde7735e463, type: 3}
   m_UVRect:
     serializedVersion: 2
     x: 0
@@ -657,7 +657,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 320, y: 0.3}
-  m_SizeDelta: {x: 50, y: 50}
+  m_SizeDelta: {x: 71.875, y: 93.75}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1292954727
 MonoBehaviour:
@@ -692,7 +692,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 6829692438120287467, guid: 8699b0eb5746078499edb00a95f1ebd3, type: 3}
+  m_Sprite: {fileID: -3392124256311189724, guid: d065feba63319e048839934b72831600, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -820,7 +820,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -319, y: -4}
+  m_AnchoredPosition: {x: -342, y: -0}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1957041435
@@ -859,8 +859,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Loading
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: acbf20dd576df1b438c8646f1066cbec, type: 2}
+  m_sharedMaterial: {fileID: 7985212159326227869, guid: acbf20dd576df1b438c8646f1066cbec, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -884,13 +884,13 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
+  m_fontSize: 39.5
   m_fontSizeBase: 36
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 0
+  m_fontStyle: 1
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
   m_textAlignment: 65535
@@ -988,7 +988,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   progressBar: {fileID: 791459517}
+  tipText: {fileID: 1957041436}
+  fadeGroup: {fileID: 0}
   sceneToLoad: SampleScene
+  minDisplayTime: 2
+  authTimeout: 5
+  tipInterval: 3
+  tips: []
+  fadeOutTime: 0.25
 --- !u!1 &2098898649
 GameObject:
   m_ObjectHideFlags: 0
